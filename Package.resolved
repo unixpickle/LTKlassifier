@@ -1,5 +1,5 @@
 {
-  "originHash" : "c90cec91ce60f6e9a5b1844f655ced1442c542e69c404db4a534ebd79cb6b510",
+  "originHash" : "0889cffdad021fa50c4514a97c549da23761325124eb96accf720ef13f1b05c7",
   "pins" : [
     {
       "identity" : "coreml-builder",
@@ -26,6 +26,15 @@
       "state" : {
         "revision" : "e2101f829dac5ff6385e69925b7a60b32c267f17",
         "version" : "0.0.19"
+      }
+    },
+    {
+      "identity" : "sqlite.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/stephencelis/SQLite.swift.git",
+      "state" : {
+        "revision" : "a95fc6df17d108bd99210db5e8a9bac90fe984b8",
+        "version" : "0.15.3"
       }
     },
     {
