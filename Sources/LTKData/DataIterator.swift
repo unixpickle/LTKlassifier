@@ -1,6 +1,6 @@
 import Foundation
 import Honeycrisp
-import LTKModel
+import LTKLabel
 import SQLite
 
 public enum DataError: Error {
@@ -10,7 +10,7 @@ public enum DataError: Error {
 
 public struct DataIterator: Sequence, IteratorProtocol {
 
-  public enum ImageID: Codable {
+  public enum ImageID: Codable, Sendable {
     case product(String)
     case ltk(String)
 
@@ -22,7 +22,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
     }
   }
 
-  public struct State: Codable {
+  public struct State: Codable, Sendable {
     public var images: [ImageID]
     public var offset: Int
   }
@@ -35,14 +35,14 @@ public struct DataIterator: Sequence, IteratorProtocol {
   let idField = SQLite.Expression<String>("id")
   let dataField = SQLite.Expression<Data?>("data")
   let errorField = SQLite.Expression<String?>("error")
-  let priceField = SQLite.Expression<Float?>("price")
+  let priceField = SQLite.Expression<Double?>("price")
 
   let lock: NSLock = NSLock()
 
   let connection: Connection
   let batchSize: Int
   let imageSize: Int
-  var state: State
+  public var state: State
 
   public init(dbPath: String, batchSize: Int, imageSize: Int = 224) throws {
     connection = try Connection(dbPath)
@@ -69,7 +69,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
     return (train: train, test: test)
   }
 
-  public mutating func next() -> (Tensor, [[String: Label]], State)? {
+  public mutating func next() -> Swift.Result<(Tensor, [[String: Label]], State), Error>? {
     var batch = [Tensor]()
     var labels = [[String: Label]]()
     for _ in 0..<batchSize {
@@ -77,9 +77,9 @@ public struct DataIterator: Sequence, IteratorProtocol {
         let (img, label) = try nextExample()
         batch.append(img)
         labels.append(label)
-      } catch { fatalError("failed to load data: example: \(error)") }
+      } catch { return .failure(error) }
     }
-    return (Tensor(stack: batch), labels, state)
+    return .success((Tensor(stack: batch), labels, state))
   }
 
   mutating func nextExample() throws -> (Tensor, [String: Label]) {
@@ -106,7 +106,10 @@ public struct DataIterator: Sequence, IteratorProtocol {
     guard let imgTensor = loadImage(imageData, imageSize: imageSize) else {
       throw DataError.decodeImage
     }
-    return (imgTensor, [:])
+    return (
+      imgTensor,
+      [ImageKind.fieldName: .categorical(count: ImageKind.count, label: ImageKind.product.rawValue)]
+    )
   }
 
   func read(product: String) throws -> (Tensor, [String: Label]) {
@@ -117,6 +120,19 @@ public struct DataIterator: Sequence, IteratorProtocol {
     guard let imgTensor = loadImage(imageData, imageSize: imageSize) else {
       throw DataError.decodeImage
     }
-    return (imgTensor, [:])
+    var fields: [String: Label] = [
+      ImageKind.fieldName: .categorical(count: ImageKind.count, label: ImageKind.ltk.rawValue)
+    ]
+    let price = try lock.withLock {
+      let it = try connection.prepare(productsTable.filter(idField == product))
+      return it.makeIterator().next()![priceField]
+    }
+    if let price = price {
+      fields["product_price"] = .categorical(
+        count: PriceRange.count,
+        label: PriceRange.from(price: price).rawValue
+      )
+    }
+    return (imgTensor, fields)
   }
 }

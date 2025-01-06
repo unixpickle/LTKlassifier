@@ -1,29 +1,6 @@
 import HCBacktrace
 import Honeycrisp
-
-public enum LabelDescriptor {
-  case categorical(Int)
-  case bitset(Int)
-
-  public var channelCount: Int {
-    switch self {
-    case .categorical(let count): count
-    case .bitset(let count): count
-    }
-  }
-}
-
-public enum Label {
-  case categorical(count: Int, label: Int)
-  case bitset([Bool])
-
-  public var descriptor: LabelDescriptor {
-    switch self {
-    case .categorical(let count, _): .categorical(count)
-    case .bitset(let bits): .bitset(bits.count)
-    }
-  }
-}
+import LTKLabel
 
 public class LabelPredictor: Trainable {
 

@@ -7,6 +7,7 @@ let package = Package(
   name: "LTKlassifier",
   platforms: [.macOS(.v13)],
   products: [
+    .library(name: "LTKLabel", targets: ["LTKLabel"]),
     .library(name: "LTKModel", targets: ["LTKModel"]),
     .library(name: "LTKData", targets: ["LTKData"]),
   ],
@@ -16,17 +17,18 @@ let package = Package(
     .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
   ],
   targets: [
+    .target(name: "LTKLabel", dependencies: []),
     .target(
       name: "LTKModel",
       dependencies: [
-        .product(name: "Honeycrisp", package: "honeycrisp"),
+        "LTKLabel", .product(name: "Honeycrisp", package: "honeycrisp"),
         .product(name: "HCBacktrace", package: "honeycrisp"),
       ]
     ),
     .target(
       name: "LTKData",
       dependencies: [
-        "LTKModel", .product(name: "Honeycrisp", package: "honeycrisp"),
+        "LTKLabel", "LTKModel", .product(name: "Honeycrisp", package: "honeycrisp"),
         .product(name: "HCBacktrace", package: "honeycrisp"),
         .product(name: "SQLite", package: "sqlite.swift"),
       ]
@@ -34,7 +36,8 @@ let package = Package(
     .executableTarget(
       name: "TrainLTK",
       dependencies: [
-        "LTKModel", "LTKData", .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        "LTKModel", "LTKData", "LTKLabel",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Honeycrisp", package: "honeycrisp"),
         .product(name: "HCBacktrace", package: "honeycrisp"),
       ]
