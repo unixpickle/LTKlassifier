@@ -27,7 +27,7 @@ public class ConvNormAct: Trainable {
       groups: depthwise ? inCount : 1,
       bias: false
     )
-    norm = GroupNorm(groupCount: 32, channelCount: outCount)
+    norm = GroupNorm(groupCount: (outCount % 32 == 0 ? 32 : 16), channelCount: outCount)
   }
 
   @recordCaller private func _callAsFunction(_ x: Tensor) -> Tensor {

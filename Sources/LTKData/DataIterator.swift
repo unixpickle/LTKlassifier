@@ -50,12 +50,15 @@ public struct DataIterator: Sequence, IteratorProtocol {
     self.imageSize = imageSize
     self.state = State(images: [], offset: 0)
 
-    for item in try connection.prepare(productImagesTable.filter(dataField != nil)) {
-      state.images.append(.product(item[idField]))
-    }
-    for item in try connection.prepare(ltkImagesTable.filter(dataField != nil)) {
+    print(" [DataIterator] listing products...")
+    for item in try connection.prepare(
+      productImagesTable.filter(errorField == nil).select([idField])
+    ) { state.images.append(.product(item[idField])) }
+    print(" [DataIterator] listing LTKs...")
+    for item in try connection.prepare(ltkImagesTable.filter(errorField == nil).select([idField])) {
       state.images.append(.ltk(item[idField]))
     }
+    print(" [DataIterator] sorting dataset...")
     // The ids seem to be quasi-random at the beginning, so sorting by ID
     // should be roughly equivalent to shuffling.
     state.images.sort { x, y in x.id < y.id }
@@ -65,7 +68,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
     var train = self
     var test = self
     train.state.images = train.state.images.filter { !$0.id.starts(with: "0") }
-    test.state.images = train.state.images.filter { $0.id.starts(with: "0") }
+    test.state.images = test.state.images.filter { $0.id.starts(with: "0") }
     return (train: train, test: test)
   }
 
@@ -83,8 +86,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
   }
 
   mutating func nextExample() throws -> (Tensor, [String: Label]) {
-    while true {
-      if state.images.isEmpty { throw DataError.noData }
+    while !state.images.isEmpty {
       let obj = state.images[state.offset % state.images.count]
       do {
         let result =
@@ -96,6 +98,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
         return result
       } catch { state.images.remove(at: state.offset % state.images.count) }
     }
+    throw DataError.noData
   }
 
   func read(ltk: String) throws -> (Tensor, [String: Label]) {

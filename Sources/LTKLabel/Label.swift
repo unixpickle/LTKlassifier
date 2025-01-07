@@ -1,6 +1,3 @@
-import HCBacktrace
-import Honeycrisp
-
 public enum LabelDescriptor: Sendable {
   public static let allLabels = [
     "kind": LabelDescriptor.categorical(ImageKind.count),

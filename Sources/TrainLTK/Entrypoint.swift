@@ -47,7 +47,7 @@ import LTKModel
           if let ts = s.testData { testLoader.state = ts }
         }
         return loadDataInBackgroundSending(
-          zip(trainLoader, testLoader).map { (x, y) in
+          zip(trainLoader, testLoader).lazy.map { (x, y) in
             switch x {
             case .success(let x):
               switch y {
