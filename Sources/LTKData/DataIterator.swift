@@ -20,6 +20,17 @@ public struct DataIterator: Sequence, IteratorProtocol {
       case .ltk(let x): x
       }
     }
+
+    var sortKey: String {
+      // The first component of the UUIDs seem to be quasi-random,
+      // so sorting by ID should be roughly equivalent to shuffling.
+      //
+      // However, the IDs are scraped in order, so there might be a bias
+      // in linear ID space towards more downloads at the beginning.
+      // To avoid this, we reverse the first component of the ID to avoid
+      // this bias.
+      String(id.split(separator: "-").first!.reversed())
+    }
   }
 
   public struct State: Codable, Sendable {
@@ -59,9 +70,9 @@ public struct DataIterator: Sequence, IteratorProtocol {
       state.images.append(.ltk(item[idField]))
     }
     print(" [DataIterator] sorting dataset...")
-    // The ids seem to be quasi-random at the beginning, so sorting by ID
-    // should be roughly equivalent to shuffling.
-    state.images.sort { x, y in x.id < y.id }
+    var keys = [String: String]()
+    for img in state.images { keys[img.id] = img.sortKey }
+    state.images.sort { x, y in keys[x.id]! < keys[y.id]! }
   }
 
   public func splitTrainTest() -> (train: DataIterator, test: DataIterator) {

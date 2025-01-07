@@ -27,7 +27,10 @@ public class ConvNormAct: Trainable {
       groups: depthwise ? inCount : 1,
       bias: false
     )
-    norm = GroupNorm(groupCount: (outCount % 32 == 0 ? 32 : 16), channelCount: outCount)
+    guard let groupCount = [32, 24, 16, 8].first(where: { outCount % $0 == 0 }) else {
+      tracedFatalError("cannot create group normalization for channels \(outCount)")
+    }
+    norm = GroupNorm(groupCount: groupCount, channelCount: outCount)
   }
 
   @recordCaller private func _callAsFunction(_ x: Tensor) -> Tensor {
@@ -62,7 +65,7 @@ public class InvertedResidual: Trainable {
         depthwise: true
       )
     )
-    layers.append(ConvNormAct(inCount: hiddenDim, outCount: hiddenDim, kernelSize: 1, doAct: false))
+    layers.append(ConvNormAct(inCount: hiddenDim, outCount: outCount, kernelSize: 1, doAct: false))
     self.layers = TrainableArray(layers)
   }
 

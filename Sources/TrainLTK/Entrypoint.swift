@@ -93,7 +93,9 @@ import LTKModel
 
         var logFields = [String]()
         for (prefixKey, losses) in [("test", testLosses), ("train", trainLosses)] {
-          for (key, loss) in losses { logFields.append("\(prefixKey)_\(key)=\(loss)") }
+          for (key, loss) in losses {
+            logFields.append("\(prefixKey)_\(key)=\(try await loss.item())")
+          }
         }
         logFields.sort()
 
