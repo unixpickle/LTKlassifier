@@ -1,7 +1,9 @@
 public enum LabelDescriptor: Sendable {
   public static let allLabels = [
     "kind": LabelDescriptor.categorical(ImageKind.count),
-    "product_price": LabelDescriptor.categorical(PriceRange.count),
+    "product_dollars": LabelDescriptor.categorical(PriceRange.count),
+    "ltk_total_dollars": LabelDescriptor.categorical(PriceRange.count),
+    "ltk_product_count": LabelDescriptor.categorical(16),
   ]
 
   case categorical(Int)
