@@ -20,20 +20,25 @@ public class LabelPredictor: Trainable {
 public class PredictionLayer: Trainable {
 
   public let inputCount: Int
-  public let labels: [String: LabelDescriptor]
+  public let labels: [Field: LabelDescriptor]
   @Child var predictors: TrainableDictionary<LabelPredictor>
 
-  public init(inputCount: Int, labels: [String: LabelDescriptor]) {
+  public init(inputCount: Int, labels: [Field: LabelDescriptor]) {
     self.inputCount = inputCount
     self.labels = labels
     super.init()
     predictors = TrainableDictionary(
-      labels.mapValues { desc in LabelPredictor(inputCount: inputCount, descriptor: desc) }
+      Dictionary(
+        uniqueKeysWithValues: labels.map { (k, desc) in
+          (k.rawValue, LabelPredictor(inputCount: inputCount, descriptor: desc))
+        }
+      )
     )
   }
 
-  @recordCaller private func _callAsFunction(_ x: Tensor) -> [String: Tensor] {
-    predictors.children.mapValues { layer in layer(x) }
+  @recordCaller private func _callAsFunction(_ x: Tensor) -> [Field: Tensor] {
+    let outputs = predictors.children.mapValues { layer in layer(x) }
+    return Dictionary(uniqueKeysWithValues: labels.keys.map { k in (k, outputs[k.rawValue]!) })
   }
 
 }

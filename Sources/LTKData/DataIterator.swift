@@ -8,77 +8,6 @@ public enum DataError: Error {
   case decodeImage
 }
 
-public enum Currency {
-  case usd
-  case eur
-  case gbp
-  case php
-  case aud
-  case sgd
-  case cad
-  case nok
-  case brl
-  case chf
-  case clp
-  case mxn
-  case vnd
-  case hkd
-  case sek
-  case uah
-  case ils
-  case tryy
-  case aed
-
-  static func parse(_ x: String) -> Self? {
-    switch x {
-    case "USD": .usd
-    case "EUR": .eur
-    case "GBP": .gbp
-    case "PHP": .php
-    case "AUD": .aud
-    case "SGD": .sgd
-    case "CAD": .cad
-    case "NOK": .nok
-    case "BRL": .brl
-    case "CHF": .chf
-    case "CLP": .clp
-    case "MXN": .mxn
-    case "VND": .vnd
-    case "HKD": .hkd
-    case "SEK": .sek
-    case "UAH": .uah
-    case "ILS": .ils
-    case "TRY": .tryy
-    case "AED": .aed
-    default: nil
-    }
-  }
-
-  func intoDollars(_ x: Double) -> Double {
-    switch self {
-    case .usd: x
-    case .eur: x / 0.9589
-    case .gbp: x / 0.7951
-    case .php: x / 57.899
-    case .aud: x / 1.6068
-    case .sgd: x / 1.3581
-    case .cad: x / 1.4405
-    case .nok: x / 11.0019
-    case .brl: x / 5.0
-    case .chf: x / 0.9017
-    case .clp: x / 900.0
-    case .mxn: x / 20.333
-    case .vnd: x / 23000.0
-    case .hkd: x / 7.7656
-    case .sek: x / 10.5
-    case .uah: x / 27.0
-    case .ils: x / 3.5
-    case .tryy: x / 25.0
-    case .aed: x / 3.6725
-    }
-  }
-}
-
 public struct DataIterator: Sequence, IteratorProtocol {
 
   public enum ImageID: Codable, Sendable {
@@ -119,6 +48,8 @@ public struct DataIterator: Sequence, IteratorProtocol {
   let errorField = SQLite.Expression<String?>("error")
   let priceField = SQLite.Expression<Double?>("price")
   let currencyField = SQLite.Expression<String?>("currency")
+  let retailerDisplayNameField = SQLite.Expression<String?>("retailer_display_name")
+  let captionField = SQLite.Expression<String>("caption")
   let productIDsField = SQLite.Expression<String>("product_ids")
 
   let connection: Connection
@@ -155,9 +86,9 @@ public struct DataIterator: Sequence, IteratorProtocol {
     return (train: train, test: test)
   }
 
-  public mutating func next() -> Swift.Result<(Tensor, [[String: Label]], State), Error>? {
+  public mutating func next() -> Swift.Result<(Tensor, [[Field: Label]], State), Error>? {
     var batch = [Tensor]()
-    var labels = [[String: Label]]()
+    var labels = [[Field: Label]]()
     for _ in 0..<batchSize {
       do {
         let (img, label) = try nextExample()
@@ -168,7 +99,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
     return .success((Tensor(stack: batch), labels, state))
   }
 
-  mutating func nextExample() throws -> (Tensor, [String: Label]) {
+  mutating func nextExample() throws -> (Tensor, [Field: Label]) {
     while !state.images.isEmpty {
       let obj = state.images[state.offset % state.images.count]
       do {
@@ -184,64 +115,90 @@ public struct DataIterator: Sequence, IteratorProtocol {
     throw DataError.noData
   }
 
-  func read(ltk: String) throws -> (Tensor, [String: Label]) {
+  func read(ltk: String) throws -> (Tensor, [Field: Label]) {
     let imageData = try connection.prepare(ltkImagesTable.filter(idField == ltk)).makeIterator()
       .next()![dataField]!
     guard let imgTensor = loadImage(imageData, imageSize: imageSize) else {
       throw DataError.decodeImage
     }
-    var fields: [String: Label] = [
-      ImageKind.fieldName: .categorical(count: ImageKind.count, label: ImageKind.ltk.rawValue)
+    var fields: [Field: Label] = [
+      .imageKind: .categorical(count: ImageKind.count, label: ImageKind.ltk.rawValue)
     ]
-    let productIDs = try connection.prepare(ltksTable.filter(idField == ltk)).makeIterator()
-      .next()![productIDsField]
+    let ltkItem = try connection.prepare(ltksTable.filter(idField == ltk)).makeIterator().next()!
+
+    let caption = ltkItem[captionField]
+    var hashtags = [Bool](repeating: false, count: Hashtag.count)
+    for token in caption.lowercased().components(separatedBy: .whitespacesAndNewlines) {
+      if let tokenIdx = Hashtag.label(token) { hashtags[tokenIdx] = true }
+    }
+    fields[.ltkHashtags] = .bitset(hashtags)
+
+    let productIDs = ltkItem[productIDsField]
     var totalDollars: Double = 0.0
-    var hasTotalPrice: Bool = true
+    var allProductsHavePrice: Bool = true
     var productCount: Int = 0
-    for id in productIDs.split(separator: ",") {
+    var retailers = [Bool](repeating: false, count: Retailer.count)
+    for id in productIDs.split(separator: ",").map({ String($0) }) {
       if id.isEmpty { continue }
+      guard let row = try getProductRow(id) else { continue }
       productCount += 1
-      if let price = try productDollarAmount(String(id)) {
+      if let price = try productDollarAmount(row) {
         totalDollars += price
       } else {
-        hasTotalPrice = false
+        allProductsHavePrice = false
       }
+      if let retailer = row[retailerDisplayNameField] { retailers[Retailer.label(retailer)] = true }
     }
-    if hasTotalPrice && productCount > 0 {
-      fields["ltk_total_dollars"] = .categorical(
+    if allProductsHavePrice && productCount > 0 {
+      fields[.ltkTotalDollars] = .categorical(
         count: PriceRange.count,
         label: PriceRange.from(price: totalDollars).rawValue
       )
     }
-    fields["ltk_product_count"] = .categorical(count: 16, label: Swift.max(productCount, 15))
+    fields[.ltkRetailers] = .bitset(retailers)
+    fields[.ltkProductCount] = .categorical(
+      count: LabelDescriptor.maxProductCount,
+      label: Swift.min(productCount, LabelDescriptor.maxProductCount - 1)
+    )
+
     return (imgTensor, fields)
   }
 
-  func read(product: String) throws -> (Tensor, [String: Label]) {
-    guard
-      let firstRow = try connection.prepare(productImagesTable.filter(idField == product))
-        .makeIterator().next()
-    else { fatalError("no row") }
-    let imageData = firstRow[dataField]!
+  func read(product: String) throws -> (Tensor, [Field: Label]) {
+    let imageData = try connection.prepare(productImagesTable.filter(idField == product))
+      .makeIterator().next()![dataField]!
     guard let imgTensor = loadImage(imageData, imageSize: imageSize) else {
       throw DataError.decodeImage
     }
-    var fields: [String: Label] = [
-      ImageKind.fieldName: .categorical(count: ImageKind.count, label: ImageKind.product.rawValue)
+
+    var fields: [Field: Label] = [
+      .imageKind: .categorical(count: ImageKind.count, label: ImageKind.product.rawValue)
     ]
-    if let price = try productDollarAmount(product) {
-      fields["product_dollars"] = .categorical(
-        count: PriceRange.count,
-        label: PriceRange.from(price: price).rawValue
-      )
+
+    if let record = try getProductRow(product) {
+      if let price = try productDollarAmount(record) {
+        fields[.productDollars] = .categorical(
+          count: PriceRange.count,
+          label: PriceRange.from(price: price).rawValue
+        )
+      }
+      if let retailer = record[retailerDisplayNameField] {
+        fields[.productRetailer] = .categorical(
+          count: Retailer.count,
+          label: Retailer.label(retailer)
+        )
+      }
     }
+
     return (imgTensor, fields)
   }
 
-  func productDollarAmount(_ id: String) throws -> Double? {
-    let it = try connection.prepare(productsTable.filter(idField == id))
-    guard let item = it.makeIterator().next() else { return nil }
-    guard let price = item[priceField], let currencyName = item[currencyField],
+  func getProductRow(_ id: String) throws -> Row? {
+    return try connection.prepare(productsTable.filter(idField == id)).makeIterator().next()
+  }
+
+  func productDollarAmount(_ row: Row) throws -> Double? {
+    guard let price = row[priceField], let currencyName = row[currencyField],
       let currency = Currency.parse(currencyName)
     else { return nil }
     return currency.intoDollars(price)

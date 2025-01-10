@@ -1,9 +1,24 @@
+public enum Field: String, Sendable, Codable {
+  case imageKind = "kind"
+  case productDollars = "product_dollars"
+  case ltkTotalDollars = "ltk_total_dollars"
+  case ltkProductCount = "ltk_product_count"
+  case ltkHashtags = "ltk_hashtags"
+  case ltkRetailers = "ltk_retailers"
+  case productRetailer = "product_retailer"
+}
+
 public enum LabelDescriptor: Sendable {
-  public static let allLabels = [
-    "kind": LabelDescriptor.categorical(ImageKind.count),
-    "product_dollars": LabelDescriptor.categorical(PriceRange.count),
-    "ltk_total_dollars": LabelDescriptor.categorical(PriceRange.count),
-    "ltk_product_count": LabelDescriptor.categorical(16),
+  public static let maxProductCount = 16
+
+  public static let allLabels: [Field: LabelDescriptor] = [
+    .imageKind: LabelDescriptor.categorical(ImageKind.count),
+    .productDollars: LabelDescriptor.categorical(PriceRange.count),
+    .ltkTotalDollars: LabelDescriptor.categorical(PriceRange.count),
+    .ltkProductCount: LabelDescriptor.categorical(maxProductCount),
+    .ltkHashtags: LabelDescriptor.bitset(Hashtag.count),
+    .ltkRetailers: LabelDescriptor.bitset(Retailer.count),
+    .productRetailer: LabelDescriptor.categorical(Retailer.count),
   ]
 
   case categorical(Int)
@@ -30,7 +45,6 @@ public enum Label: Sendable {
 }
 
 public enum ImageKind: Int, CustomStringConvertible {
-  public static let fieldName = "kind"
   public static let count = 2
 
   case product = 0

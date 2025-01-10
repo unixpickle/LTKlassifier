@@ -71,10 +71,10 @@ import LTKModel
 
       for try await ((trainImg, trainLabel, trainState), (testImg, testLabel, testState)) in dataIt
       {
-        func computeLosses(imgs: Tensor, labels: [[String: Label]]) -> ([String: Tensor], Tensor) {
+        func computeLosses(imgs: Tensor, labels: [[Field: Label]]) -> ([Field: Tensor], Tensor) {
           let preds = model(imgs)
-          let allFields = Set(labels.flatMap { $0.keys }).sorted()
-          var results = [String: Tensor]()
+          let allFields = Set(labels.flatMap { $0.keys })
+          var results = [Field: Tensor]()
           var totalLoss = Tensor(zeros: [imgs.shape[0]])
           for field in allFields {
             let indices = labels.enumerated().flatMap { (i, f) in f[field] == nil ? [] : [i] }
@@ -94,7 +94,7 @@ import LTKModel
         var logFields = [String]()
         for (prefixKey, losses) in [("test", testLosses), ("train", trainLosses)] {
           for (key, loss) in losses {
-            logFields.append("\(prefixKey)_\(key)=\(try await loss.item())")
+            logFields.append("\(prefixKey)_\(key.rawValue)=\(try await loss.item())")
           }
         }
         logFields.sort()
@@ -133,7 +133,7 @@ public func labelLosses(predictions: Tensor, targets: [Label]) -> Tensor {
       allBits.append(contentsOf: bits)
     }
     let targetTensor = Tensor(data: allBits, shape: predictions.shape, dtype: .bool)
-    return targetTensor.when(isTrue: logSigmoid(predictions), isFalse: logSigmoid(-predictions))
+    return -targetTensor.when(isTrue: logSigmoid(predictions), isFalse: logSigmoid(-predictions))
       .sum(axis: -1)
   case .categorical(let count, _):
     #alwaysAssert(count == predictions.shape[1])
