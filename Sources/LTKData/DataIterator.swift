@@ -49,6 +49,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
   let priceField = SQLite.Expression<Double?>("price")
   let currencyField = SQLite.Expression<String?>("currency")
   let retailerDisplayNameField = SQLite.Expression<String?>("retailer_display_name")
+  let nameField = SQLite.Expression<String?>("name")
   let captionField = SQLite.Expression<String>("caption")
   let productIDsField = SQLite.Expression<String>("product_ids")
 
@@ -196,6 +197,14 @@ public struct DataIterator: Sequence, IteratorProtocol {
           count: Retailer.count,
           label: Retailer.label(retailer)
         )
+      }
+      if let name = record[nameField], !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      {
+        var keywords = [Bool](repeating: false, count: ProductKeyword.count)
+        for token in name.lowercased().components(separatedBy: .whitespacesAndNewlines) {
+          if let tokenIdx = Hashtag.label(token) { keywords[tokenIdx] = true }
+        }
+        fields[.productKeywords] = .bitset(keywords)
       }
     }
 

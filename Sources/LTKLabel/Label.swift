@@ -6,6 +6,7 @@ public enum Field: String, Sendable, Codable {
   case ltkHashtags = "ltk_hashtags"
   case ltkRetailers = "ltk_retailers"
   case productRetailer = "product_retailer"
+  case productKeywords = "product_keywords"
 }
 
 public enum LabelDescriptor: Sendable {
@@ -19,6 +20,7 @@ public enum LabelDescriptor: Sendable {
     .ltkHashtags: LabelDescriptor.bitset(Hashtag.count),
     .ltkRetailers: LabelDescriptor.bitset(Retailer.count),
     .productRetailer: LabelDescriptor.categorical(Retailer.count),
+    .productKeywords: LabelDescriptor.bitset(ProductKeyword.count),
   ]
 
   case categorical(Int)
