@@ -87,40 +87,52 @@ public struct DataIterator: Sequence, IteratorProtocol {
   }
 
   public mutating func next() -> Swift.Result<(Tensor, [[Field: Label]], State), Error>? {
-    var batch = [Tensor]()
+    var ids = [ImageID]()
+    var datas = [Data]()
     var labels = [[Field: Label]]()
     for _ in 0..<batchSize {
       do {
-        let (img, label) = try nextExample()
-        batch.append(img)
+        let (id, img, label) = try nextExample()
+        ids.append(id)
+        datas.append(img)
         labels.append(label)
       } catch { return .failure(error) }
     }
-    return .success((Tensor(stack: batch), labels, state))
+
+    let sendableIDs = ids
+    let sendableDatas = datas
+    let imageSize = self.imageSize
+    let images: SendableArray<Tensor> = SendableArray(count: datas.count)
+    DispatchQueue.concurrentPerform(iterations: datas.count) { i in
+      let id = sendableIDs[i]
+      let data = sendableDatas[i]
+      guard let img = loadImage(data, imageSize: imageSize) else {
+        fatalError("failed to decode image for \(id)")
+      }
+      images[i] = img
+    }
+    return .success((Tensor(stack: images.collect()), labels, state))
   }
 
-  mutating func nextExample() throws -> (Tensor, [Field: Label]) {
+  mutating func nextExample() throws -> (ImageID, Data, [Field: Label]) {
     while !state.images.isEmpty {
       let obj = state.images[state.offset % state.images.count]
       do {
-        let result =
+        let (imageData, fields) =
           switch obj {
           case .ltk(let id): try read(ltk: id)
           case .product(let id): try read(product: id)
           }
         state.offset += 1
-        return result
+        return (obj, imageData, fields)
       } catch { state.images.remove(at: state.offset % state.images.count) }
     }
     throw DataError.noData
   }
 
-  func read(ltk: String) throws -> (Tensor, [Field: Label]) {
+  func read(ltk: String) throws -> (Data, [Field: Label]) {
     let imageData = try connection.prepare(ltkImagesTable.filter(idField == ltk)).makeIterator()
       .next()![dataField]!
-    guard let imgTensor = loadImage(imageData, imageSize: imageSize) else {
-      throw DataError.decodeImage
-    }
     var fields: [Field: Label] = [
       .imageKind: .categorical(count: ImageKind.count, label: ImageKind.ltk.rawValue)
     ]
@@ -161,15 +173,12 @@ public struct DataIterator: Sequence, IteratorProtocol {
       label: Swift.min(productCount, LabelDescriptor.maxProductCount - 1)
     )
 
-    return (imgTensor, fields)
+    return (imageData, fields)
   }
 
-  func read(product: String) throws -> (Tensor, [Field: Label]) {
+  func read(product: String) throws -> (Data, [Field: Label]) {
     let imageData = try connection.prepare(productImagesTable.filter(idField == product))
       .makeIterator().next()![dataField]!
-    guard let imgTensor = loadImage(imageData, imageSize: imageSize) else {
-      throw DataError.decodeImage
-    }
 
     var fields: [Field: Label] = [
       .imageKind: .categorical(count: ImageKind.count, label: ImageKind.product.rawValue)
@@ -190,7 +199,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
       }
     }
 
-    return (imgTensor, fields)
+    return (imageData, fields)
   }
 
   func getProductRow(_ id: String) throws -> Row? {

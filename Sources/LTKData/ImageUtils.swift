@@ -3,7 +3,7 @@ import HCBacktrace
 import Honeycrisp
 
 /// Load an image and fit it into a square.
-public func loadImage(_ data: Data, imageSize: Int) -> Tensor? {
+public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true) -> Tensor? {
   guard let loadedImage = NSImage(data: data) else { return nil }
 
   let bitsPerComponent = 8
@@ -24,15 +24,25 @@ public func loadImage(_ data: Data, imageSize: Int) -> Tensor? {
   else { return nil }
   context.clear(CGRect(origin: .zero, size: CGSize(width: imageSize, height: imageSize)))
 
+  // Randomly crop the original image.
   let size = loadedImage.size
-  let scale = CGFloat(imageSize) / max(size.width, size.height)
-  let scaledSize = CGSize(width: scale * size.width, height: scale * size.height)
+  let cropWidth =
+    if augment { CGFloat.random(in: size.width * 0.9...size.width) } else { size.width }
+  let cropHeight =
+    if augment { CGFloat.random(in: size.height * 0.9...size.height) } else { size.height }
+  let cropX = CGFloat.random(in: 0...(size.width - cropWidth))
+  let cropY = CGFloat.random(in: 0...(size.height - cropHeight))
+  let cropRect = CGRect(x: cropX, y: cropY, width: cropWidth, height: cropHeight)
+
+  let scale = CGFloat(imageSize) / max(cropWidth, cropHeight)
+  let scaledSize = CGSize(width: scale * cropWidth, height: scale * cropHeight)
   let x = floor((CGFloat(imageSize) - scaledSize.width) / 2.0)
   let y = floor((CGFloat(imageSize) - scaledSize.width) / 2.0)
   let imageRect = CGRect(origin: CGPoint(x: x, y: y), size: scaledSize)
   guard let loadedCGImage = loadedImage.cgImage(forProposedRect: nil, context: nil, hints: [:])
   else { return nil }
-  context.draw(loadedCGImage, in: imageRect)
+  guard let croppedCGImage = loadedCGImage.cropping(to: cropRect) else { return nil }
+  context.draw(croppedCGImage, in: imageRect)
 
   guard let data = context.data else { return nil }
 
