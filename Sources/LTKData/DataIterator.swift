@@ -1,5 +1,6 @@
 import Foundation
 import Honeycrisp
+import ImageUtils
 import LTKLabel
 import SQLite
 

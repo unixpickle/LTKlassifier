@@ -7,6 +7,19 @@ public enum Field: String, Sendable, Codable {
   case ltkRetailers = "ltk_retailers"
   case productRetailer = "product_retailer"
   case productKeywords = "product_keywords"
+
+  public func valueNames() -> [String] {
+    switch self {
+    case .imageKind: ["Product", "Post"]
+    case .productDollars: (0..<16).map { PriceRange(rawValue: $0)!.description }
+    case .ltkTotalDollars: (0..<16).map { PriceRange(rawValue: $0)!.description }
+    case .ltkProductCount: (0..<LabelDescriptor.maxProductCount).map { "\($0)" }
+    case .ltkHashtags: Hashtag.values
+    case .ltkRetailers: ["Unknown"] + Retailer.canonicalNames
+    case .productRetailer: ["Unknown"] + Retailer.canonicalNames
+    case .productKeywords: ProductKeyword.items
+    }
+  }
 }
 
 public enum LabelDescriptor: Sendable {

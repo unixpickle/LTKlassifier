@@ -5,10 +5,11 @@ import PackageDescription
 
 let package = Package(
   name: "LTKlassifier",
-  platforms: [.macOS(.v13)],
+  platforms: [.macOS(.v14)],
   products: [
     .library(name: "LTKLabel", targets: ["LTKLabel"]),
     .library(name: "LTKModel", targets: ["LTKModel"]),
+    .library(name: "ImageUtils", targets: ["ImageUtils"]),
     .library(name: "LTKData", targets: ["LTKData"]),
   ],
   dependencies: [
@@ -28,9 +29,16 @@ let package = Package(
     .target(
       name: "LTKData",
       dependencies: [
-        "LTKLabel", "LTKModel", .product(name: "Honeycrisp", package: "honeycrisp"),
+        "LTKLabel", "LTKModel", "ImageUtils", .product(name: "Honeycrisp", package: "honeycrisp"),
         .product(name: "HCBacktrace", package: "honeycrisp"),
         .product(name: "SQLite", package: "sqlite.swift"),
+      ]
+    ),
+    .target(
+      name: "ImageUtils",
+      dependencies: [
+        .product(name: "Honeycrisp", package: "honeycrisp"),
+        .product(name: "HCBacktrace", package: "honeycrisp"),
       ]
     ),
     .executableTarget(
@@ -39,6 +47,13 @@ let package = Package(
         "LTKModel", "LTKData", "LTKLabel",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Honeycrisp", package: "honeycrisp"),
+        .product(name: "HCBacktrace", package: "honeycrisp"),
+      ]
+    ),
+    .executableTarget(
+      name: "ClassifyUI",
+      dependencies: [
+        "LTKModel", "LTKLabel", "ImageUtils", .product(name: "Honeycrisp", package: "honeycrisp"),
         .product(name: "HCBacktrace", package: "honeycrisp"),
       ]
     ),
