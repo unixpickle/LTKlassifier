@@ -11,5 +11,5 @@ final class SendableArray<T: Sendable>: Sendable {
     set { lock.withLock { data[index] = newValue } }
   }
 
-  public func collect() -> [T] { lock.withLock { data.map { $0! } } }
+  public func collect() -> [T?] { lock.withLock { data.map { $0 } } }
 }

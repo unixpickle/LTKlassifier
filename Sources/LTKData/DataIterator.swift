@@ -101,19 +101,32 @@ public struct DataIterator: Sequence, IteratorProtocol {
       } catch { return .failure(error) }
     }
 
-    let sendableIDs = ids
-    let sendableDatas = datas
-    let imageSize = self.imageSize
     let images: SendableArray<Tensor> = SendableArray(count: datas.count)
-    DispatchQueue.concurrentPerform(iterations: datas.count) { i in
-      let id = sendableIDs[i]
-      let data = sendableDatas[i]
-      guard let img = loadImage(data, imageSize: imageSize) else {
-        fatalError("failed to decode image for \(id)")
+    while !images.collect().allSatisfy({ $0 != nil }) {
+      let sendableIDs = ids
+      let sendableDatas = datas
+      let imageSize = self.imageSize
+      DispatchQueue.concurrentPerform(iterations: datas.count) { i in
+        if images[i] != nil { return }
+        let id = sendableIDs[i]
+        let data = sendableDatas[i]
+        if let img = loadImage(data, imageSize: imageSize) {
+          images[i] = img
+        } else {
+          print("image \(id) could not be loaded")
+        }
       }
-      images[i] = img
+      for (i, x) in images.collect().enumerated() {
+        if x != nil { continue }
+        do {
+          let (id, img, label) = try nextExample()
+          ids[i] = id
+          datas[i] = img
+          labels[i] = label
+        } catch { return .failure(error) }
+      }
     }
-    return .success((Tensor(stack: images.collect()), labels, state))
+    return .success((Tensor(stack: images.collect().map { $0! }), labels, state))
   }
 
   mutating func nextExample() throws -> (ImageID, Data, [Field: Label]) {
@@ -203,7 +216,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
       {
         var keywords = [Bool](repeating: false, count: ProductKeyword.count)
         for token in name.lowercased().components(separatedBy: .whitespacesAndNewlines) {
-          if let tokenIdx = Hashtag.label(token) { keywords[tokenIdx] = true }
+          if let tokenIdx = ProductKeyword.label(token) { keywords[tokenIdx] = true }
         }
         fields[.productKeywords] = .bitset(keywords)
       }
