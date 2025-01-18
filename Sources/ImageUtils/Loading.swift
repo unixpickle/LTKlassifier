@@ -6,6 +6,8 @@ import Honeycrisp
 public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true) -> Tensor? {
   guard let loadedImage = NSImage(data: data) else { return nil }
 
+  guard let representation = loadedImage.representations.first else { return nil }
+
   let bitsPerComponent = 8
   let bytesPerRow = imageSize * 4
   let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -25,7 +27,10 @@ public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true) -> Ten
   context.clear(CGRect(origin: .zero, size: CGSize(width: imageSize, height: imageSize)))
 
   // Randomly crop the original image.
-  let size = loadedImage.size
+  let size = CGSize(
+    width: CGFloat(representation.pixelsWide),
+    height: CGFloat(representation.pixelsHigh)
+  )
   let cropWidth =
     if augment { CGFloat.random(in: size.width * 0.9...size.width) } else { size.width }
   let cropHeight =
@@ -36,8 +41,8 @@ public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true) -> Ten
 
   let scale = CGFloat(imageSize) / max(cropWidth, cropHeight)
   let scaledSize = CGSize(width: scale * cropWidth, height: scale * cropHeight)
-  let x = floor((CGFloat(imageSize) - scaledSize.width) / 2.0)
-  let y = floor((CGFloat(imageSize) - scaledSize.width) / 2.0)
+  let x = round((CGFloat(imageSize) - scaledSize.width) / 2.0)
+  let y = round((CGFloat(imageSize) - scaledSize.height) / 2.0)
   let imageRect = CGRect(origin: CGPoint(x: x, y: y), size: scaledSize)
   guard let loadedCGImage = loadedImage.cgImage(forProposedRect: nil, context: nil, hints: [:])
   else { return nil }

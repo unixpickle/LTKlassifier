@@ -61,30 +61,34 @@ enum ImageError: Error { case failedToDecodeImage }
           if let err = modelLoadError { Text(err).foregroundStyle(.red) }
 
           if model != nil {
-            Button {
-              pickingImage = true
-            } label: {
-              Text("Classify Image")
-            }.disabled(classifyingImage).fileImporter(
-              isPresented: $pickingImage,
-              allowedContentTypes: [.image],
-              allowsMultipleSelection: false,
-              onCompletion: { results in
-                switch results {
-                case .success(let fileURLs):
-                  #alwaysAssert(fileURLs.count == 1)
-                  let url = fileURLs.first!
-                  Task { await self.classifyImage(url) }
-                case .failure(let error): classifyError = "Failed to load model: \(error)"
-                }
+            HStack {
+              if let modelOutput = modelOutput {
+                Classifications(modelOutput: modelOutput, selectedField: $selectedField)
+                Divider().frame(width: 1)
               }
-            )
-
-            if classifyingImage { ProgressView() }
-            if let err = classifyError { Text(err).foregroundStyle(.red) }
-            if let image = image { image.resizable().frame(maxWidth: 128, maxHeight: 128) }
-            if let modelOutput = modelOutput {
-              Classifications(modelOutput: modelOutput, selectedField: $selectedField)
+              VStack {
+                Button {
+                  pickingImage = true
+                } label: {
+                  Text("Classify Image")
+                }.disabled(classifyingImage).fileImporter(
+                  isPresented: $pickingImage,
+                  allowedContentTypes: [.image],
+                  allowsMultipleSelection: false,
+                  onCompletion: { results in
+                    switch results {
+                    case .success(let fileURLs):
+                      #alwaysAssert(fileURLs.count == 1)
+                      let url = fileURLs.first!
+                      Task { await self.classifyImage(url) }
+                    case .failure(let error): classifyError = "Failed to load model: \(error)"
+                    }
+                  }
+                )
+                if classifyingImage { ProgressView() }
+                if let err = classifyError { Text(err).foregroundStyle(.red) }
+                if let image = image { image.resizable().frame(width: 192, height: 192) }
+              }
             }
           }
         }
@@ -124,7 +128,8 @@ enum ImageError: Error { case failedToDecodeImage }
           }
         } catch { continuation.resume(throwing: error) }
       }
-      image = Image(nsImage: NSImage(byReferencing: url))
+      let reencodedImage = try await encodeImage(imageTensor)
+      image = Image(nsImage: NSImage(data: reencodedImage)!)
       if let model = model {
         let output = model(imageTensor[NewAxis()])
         var outs: [Field: [Float]] = [:]

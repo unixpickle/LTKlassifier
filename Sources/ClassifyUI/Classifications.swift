@@ -25,7 +25,7 @@ struct Classifications: View {
     }
     HStack {
       Table(allFields, selection: $selectedField) { TableColumn("field", value: \.id) }.frame(
-        width: 100.0
+        width: 150.0
       )
       if selectedField.count == 1 {
         let selectedID = Array(selectedField).first!
