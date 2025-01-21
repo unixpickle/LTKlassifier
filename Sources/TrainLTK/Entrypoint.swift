@@ -97,13 +97,25 @@ import LTKModel
             logFields.append("\(prefixKey)_\(key.rawValue)=\(try await loss.item())")
           }
         }
-        logFields.sort()
 
         loss.backward()
+        let gn = try await gradNorm(model)
+        if !gn.isFinite {
+          print("NaN detected in gradient!")
+          for (name, param) in model.parameters {
+            if let g = param.grad {
+              print(name, try await g.pow(2).sum().sqrt().item())
+            }
+          }
+          fatalError()
+        }
+
         opt.step()
         opt.clearGrads()
-
         step += 1
+
+        logFields.append("grad_norm=\(gn)")
+        logFields.sort()
         print("step \(step): \(logFields.joined(separator: " "))")
 
         if step % saveInterval == 0 {
@@ -120,6 +132,14 @@ import LTKModel
         }
       }
     } catch { print("fatal error: \(error)") }
+  }
+
+  func gradNorm(_ model: Trainable) async throws -> Float {
+    var sum = Tensor(zeros: [])
+    for (_, param) in model.parameters {
+      if let g = param.grad { sum = sum + g.pow(2).sum() }
+    }
+    return try await sum.sqrt().item()
   }
 }
 
