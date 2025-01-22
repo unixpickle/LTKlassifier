@@ -14,6 +14,7 @@ import LTKModel
     var testData: DataIterator.State?
     var model: Trainable.State
     var opt: Adam.State?
+    var clipper: GradClipper.State?
   }
 
   @Option(name: .shortAndLong, help: "Path to database.") var dbPath: String
@@ -28,7 +29,7 @@ import LTKModel
   mutating func run() async {
     do {
       let flopCounter = BackendFLOPCounter(wrapping: try MPSBackend(allocator: .bucket))
-      Backend.defaultBackend = flopCounter  // TODO: this.
+      Backend.defaultBackend = flopCounter
 
       var loadedState: State? = nil
       if FileManager.default.fileExists(atPath: outputPath) {
@@ -64,11 +65,15 @@ import LTKModel
       let model = Model(labels: LabelDescriptor.allLabels)
       if let state = loadedState?.model { try model.loadState(state) }
 
-      print("training...")
+      print("creating optimizer...")
       let opt = Adam(model.parameters, lr: learningRate, weightDecay: weightDecay)
-
+      let clipper = GradClipper()
+      if let state = loadedState?.opt { try opt.loadState(state) }
+      if let state = loadedState?.clipper { clipper.state = state }
       var step = loadedState?.step ?? 0
 
+      print("training...")
+      let startTime = DispatchTime.now()
       for try await ((trainImg, trainLabel, trainState), (testImg, testLabel, testState)) in dataIt
       {
         func computeLosses(imgs: Tensor, labels: [[Field: Label]]) -> ([Field: Tensor], Tensor) {
@@ -99,13 +104,12 @@ import LTKModel
         }
 
         loss.backward()
-        let gn = try await gradNorm(model)
-        if !gn.isFinite {
+
+        let (gradNorm, clipScale) = try await clipper.clipGrads(model: model)
+        if !gradNorm.isFinite {
           print("NaN detected in gradient!")
           for (name, param) in model.parameters {
-            if let g = param.grad {
-              print(name, try await g.pow(2).sum().sqrt().item())
-            }
+            if let g = param.grad { print(name, try await g.pow(2).sum().sqrt().item()) }
           }
           fatalError()
         }
@@ -114,7 +118,12 @@ import LTKModel
         opt.clearGrads()
         step += 1
 
-        logFields.append("grad_norm=\(gn)")
+        logFields.append("grad_norm=\(gradNorm)")
+        logFields.append("grad_scale=\(clipScale)")
+        let gflops =
+          Double(flopCounter.flopCount)
+          / Double(DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds)
+        logFields.append("gflops=\(gflops)")
         logFields.sort()
         print("step \(step): \(logFields.joined(separator: " "))")
 
@@ -136,9 +145,7 @@ import LTKModel
 
   func gradNorm(_ model: Trainable) async throws -> Float {
     var sum = Tensor(zeros: [])
-    for (_, param) in model.parameters {
-      if let g = param.grad { sum = sum + g.pow(2).sum() }
-    }
+    for (_, param) in model.parameters { if let g = param.grad { sum = sum + g.pow(2).sum() } }
     return try await sum.sqrt().item()
   }
 }

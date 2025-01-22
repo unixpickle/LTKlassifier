@@ -9,13 +9,6 @@ struct Classifications: View {
     var field: Field
   }
 
-  struct BarValue: Identifiable {
-    var id: String { "\(name)" }
-
-    var name: String
-    var value: Float
-  }
-
   var modelOutput: [Field: [Float]]
   @Binding var selectedField: Set<String>
 
@@ -32,15 +25,14 @@ struct Classifications: View {
         let field = allFields.filter { $0.id == selectedID }.first!
         if let values = modelOutput[field.field] {
           let bars = zip(field.field.valueNames(), values).map { (name, value) in
-            BarValue(name: name, value: value)
+            BarGraph.Item(name: name, value: Double(value))
           }
-          ScrollView(.horizontal) {
-            Chart {
-              ForEach(bars) { bar in
-                BarMark(x: .value("Value", bar.name), y: .value("Probability", bar.value))
-              }
-            }.frame(width: max(200.0, 50 * CGFloat(bars.count)))
-          }
+          ScrollView(.vertical) {
+            BarGraph(
+              values: bars,
+              sort: field.field != Field.productDollars && field.field != Field.ltkTotalDollars
+            )
+          }.frame(maxWidth: 380)
         }
       }
     }

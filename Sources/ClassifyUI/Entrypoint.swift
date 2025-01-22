@@ -109,7 +109,7 @@ enum ImageError: Error { case failedToDecodeImage }
       }
       let m = Model(labels: LabelDescriptor.allLabels)
       try m.loadState(decoded.model)
-      print("model has been loaded")
+      m.mode = .inference
       model = m
     } catch { modelLoadError = "Failed to load model: \(error)" }
   }
