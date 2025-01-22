@@ -74,8 +74,11 @@ import LTKModel
 
       print("training...")
       let startTime = DispatchTime.now()
+      var lastItTime = DispatchTime.now()
       for try await ((trainImg, trainLabel, trainState), (testImg, testLabel, testState)) in dataIt
       {
+        let dataTime = DispatchTime.now().uptimeNanoseconds - lastItTime.uptimeNanoseconds
+
         func computeLosses(imgs: Tensor, labels: [[Field: Label]]) -> ([Field: Tensor], Tensor) {
           let preds = model(imgs)
           let allFields = Set(labels.flatMap { $0.keys })
@@ -124,6 +127,7 @@ import LTKModel
           Double(flopCounter.flopCount)
           / Double(DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds)
         logFields.append("gflops=\(gflops)")
+        logFields.append("data_secs=\(Double(dataTime) / 1e9)")
         logFields.sort()
         print("step \(step): \(logFields.joined(separator: " "))")
 
@@ -139,6 +143,8 @@ import LTKModel
           let stateData = try PropertyListEncoder().encode(state)
           try stateData.write(to: URL(filePath: outputPath), options: .atomic)
         }
+
+        lastItTime = DispatchTime.now()
       }
     } catch { print("fatal error: \(error)") }
   }
