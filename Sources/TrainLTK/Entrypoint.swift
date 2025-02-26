@@ -20,6 +20,8 @@ import LTKModel
   @Option(name: .shortAndLong, help: "Path to database.") var dbPath: String
   @Option(name: .shortAndLong, help: "Output path for the save state.") var outputPath: String =
     "model_state.plist"
+  @Option(name: .shortAndLong, help: "Output layer feature count for the model.") var featureCount:
+    Int = 1280
   @Option(name: .shortAndLong, help: "The learning rate for training.") var learningRate: Float =
     0.001
   @Option(name: .shortAndLong, help: "The weight decay for training.") var weightDecay: Float = 0.01
@@ -62,8 +64,8 @@ import LTKModel
       }()
 
       print("creating model...")
-      let model = Model(labels: LabelDescriptor.allLabels)
-      if let state = loadedState?.model { try model.loadState(state) }
+      let model = Model(labels: LabelDescriptor.allLabels, featureCount: featureCount)
+      if let state = loadedState?.model { try model.reconfigureAndLoad(state) }
 
       print("creating optimizer...")
       let opt = Adam(model.parameters, lr: learningRate, weightDecay: weightDecay)

@@ -83,7 +83,7 @@ public class MobileNetV2: Trainable {
   @Child var outConv: ConvNormAct
   @Child var dropout: Dropout
 
-  public init(inCount: Int) {
+  public init(inCount: Int, featureCount: Int = 1280) {
     super.init()
 
     var layers = [InvertedResidual]()
@@ -109,7 +109,7 @@ public class MobileNetV2: Trainable {
       }
     }
     self.layers = TrainableArray(layers)
-    outConv = ConvNormAct(inCount: curChannels, outCount: 1280, kernelSize: 1)
+    outConv = ConvNormAct(inCount: curChannels, outCount: featureCount, kernelSize: 1)
     dropout = Dropout(dropProb: 0.2)
   }
 
