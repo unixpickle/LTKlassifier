@@ -2,7 +2,7 @@ import Foundation
 import SQLite
 
 /// Maintain a separate SQLite3 connection per thread.
-final class ConnectionPool: Sendable {
+public final class ConnectionPool: Sendable {
   private static let threadKey: String = "ConnectionPoolThreadKey"
 
   let path: String
