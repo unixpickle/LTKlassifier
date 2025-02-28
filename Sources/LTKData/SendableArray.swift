@@ -1,6 +1,6 @@
 import Foundation
 
-final class SendableArray<T: Sendable>: Sendable {
+public final class SendableArray<T: Sendable>: Sendable {
   let lock = NSLock()
   nonisolated(unsafe) var data: [T?]
 

@@ -57,5 +57,14 @@ let package = Package(
         .product(name: "HCBacktrace", package: "honeycrisp"),
       ]
     ),
+    .executableTarget(
+      name: "DumpFeatures",
+      dependencies: [
+        "LTKModel", "LTKLabel", "LTKData", "ImageUtils",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Honeycrisp", package: "honeycrisp"),
+        .product(name: "HCBacktrace", package: "honeycrisp"),
+      ]
+    ),
   ]
 )

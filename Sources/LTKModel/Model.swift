@@ -4,8 +4,12 @@ import LTKLabel
 
 public class Model: Trainable {
 
-  @Child var backbone: MobileNetV2
-  @Child var prediction: PredictionLayer
+  @Child public var backbone: MobileNetV2
+  @Child public var prediction: PredictionLayer
+
+  public var featureCount: Int {
+    backbone.outConv.conv.weight.shape[0]
+  }
 
   public init(labels: [Field: LabelDescriptor], featureCount: Int = 1280) {
     super.init()
