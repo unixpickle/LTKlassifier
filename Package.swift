@@ -13,9 +13,10 @@ let package = Package(
     .library(name: "LTKData", targets: ["LTKData"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/unixpickle/honeycrisp", from: "0.0.19"),
+    .package(url: "https://github.com/unixpickle/honeycrisp", from: "0.0.29"),
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
     .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
+    .package(url: "https://github.com/vapor/vapor.git", from: "4.113.2"),
   ],
   targets: [
     .target(name: "LTKLabel", dependencies: []),
@@ -65,6 +66,17 @@ let package = Package(
         .product(name: "Honeycrisp", package: "honeycrisp"),
         .product(name: "HCBacktrace", package: "honeycrisp"),
       ]
+    ),
+    .executableTarget(
+      name: "Browse",
+      dependencies: [
+        "LTKModel", "LTKLabel", "LTKData", "ImageUtils",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Honeycrisp", package: "honeycrisp"),
+        .product(name: "HCBacktrace", package: "honeycrisp"),
+        .product(name: "Vapor", package: "vapor"),
+      ],
+      resources: [.process("Resources")]
     ),
   ]
 )

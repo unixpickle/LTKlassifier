@@ -2,10 +2,10 @@ import ArgumentParser
 import Foundation
 import HCBacktrace
 import Honeycrisp
+import ImageUtils
 import LTKData
 import LTKLabel
 import LTKModel
-import ImageUtils
 
 @main struct FilterTrain: AsyncParsableCommand {
 
@@ -29,6 +29,7 @@ import ImageUtils
 
       print("creating model...")
       let model = Model(labels: LabelDescriptor.allLabels)
+      model.mode = .inference
 
       print("loading from checkpoint: \(modelPath) ...")
       let data = try Data(contentsOf: URL(fileURLWithPath: modelPath))

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Grid</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            padding: 10px;
+        }
+
+        .grid img {
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+        }
+
+        /* Styling for the dropdown */
+        #detailDropdown {
+            margin-bottom: 15px;
+            padding: 5px;
+            font-size: 16px;
+        }
+
+        .image-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .image-link {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            text-decoration: none;
+            font-size: 12px;
+            padding: 5px;
+            border-radius: 5px;
+            visibility: hidden;
+        }
+
+        .image-container:hover .image-link {
+            visibility: visible;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Image Grid</h1>
+
+    <!-- Dropdown for selecting detail levels (will be populated dynamically) -->
+    <select id="detailDropdown" style="display: none;"></select>
+
+    <div class="grid" id="imageGrid"></div>
+
+    <script src="app.js"></script>
+
+</body>
+
+</html>

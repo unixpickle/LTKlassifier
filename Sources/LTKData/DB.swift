@@ -20,6 +20,7 @@ public final class DB: Sendable {
     public let name = SQLite.Expression<String?>("name")
     public let caption = SQLite.Expression<String>("caption")
     public let productIDs = SQLite.Expression<String>("product_ids")
+    public let hyperlink = SQLite.Expression<String>("hyperlink")
   }
 
   public let pool: ConnectionPool
