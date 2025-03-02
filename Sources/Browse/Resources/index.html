@@ -4,28 +4,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Grid</title>
+    <title>Products</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            padding: 10px;
+        #product-heading {
+            text-align: center;
+            margin-bottom: 10px;
         }
 
-        .grid img {
+        #product-heading .image {
+            height: 100px;
+        }
+
+        #product-heading .title {
+            display: block;
+            max-width: 300px;
+            text-align: center;
+            margin: auto;
+            color: #555;
+            text-decoration: none;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 200px);
+            gap: 10px;
+            padding: 10px;
+            align-items: center;
+        }
+
+        .grid .zoom-link {
             width: 100%;
-            height: auto;
-            cursor: pointer;
+        }
+
+        .grid .zoom-link img {
+            max-width: 200px;
+            max-height: 200px;
+        }
+
+        @media (max-width: 500px) {
+            .grid {
+              grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            .grid .zoom-link img {
+                max-width: 150px;
+                max-height: 150px;
+            }
+            .image-container {
+                width: 150px;
+                height: 150px;
+            }
         }
 
         /* Styling for the dropdown */
-        #detailDropdown {
+        #detail-dropdown {
             margin-bottom: 15px;
             padding: 5px;
             font-size: 16px;
@@ -34,35 +70,44 @@
         .image-container {
             position: relative;
             display: inline-block;
+            width: 200px;
+            height: 200px;
         }
 
         .image-link {
             position: absolute;
             top: 5px;
             right: 5px;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.7);
             color: white;
             text-decoration: none;
             font-size: 12px;
             padding: 5px;
             border-radius: 5px;
-            visibility: hidden;
         }
 
-        .image-container:hover .image-link {
-            visibility: visible;
+        .image-link:hover {
+            background-color: rgba(0, 0, 0, 1.0);
+        }
+
+        #home-link {
+            color: #555;
+            display: block;
+            text-align: center;
         }
     </style>
 </head>
 
 <body>
+    <a id="home-link" href="/">Start over</a>
+    <div id="product-heading" style="display: none;">
+        <img class="image">
+        <a class="title"></a>
+    </div>
 
-    <h1>Image Grid</h1>
+    <select id="detail-dropdown" style="display: none;"></select>
 
-    <!-- Dropdown for selecting detail levels (will be populated dynamically) -->
-    <select id="detailDropdown" style="display: none;"></select>
-
-    <div class="grid" id="imageGrid"></div>
+    <div class="grid" id="image-grid"></div>
 
     <script src="app.js"></script>
 

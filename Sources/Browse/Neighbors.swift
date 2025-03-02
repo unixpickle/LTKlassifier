@@ -29,7 +29,7 @@ public final class Neighbors: Sendable {
       allIDs.append(contentsOf: shard.ids)
     }
     ids = allIDs
-    features = allFeatures!
+    features = allFeatures! / allFeatures!.pow(2).sum(axis: 1, keepdims: true).sqrt()
 
     if FileManager.default.fileExists(atPath: clusterPath) {
       let data = try Data(contentsOf: URL(filePath: clusterPath))
@@ -64,7 +64,7 @@ public final class Neighbors: Sendable {
   }
 
   /// Cluster the data and return the indices of each center's nearest neighbor.
-  private static func cluster(data: Tensor, centerCount: Int, iters: Int = 10) async throws -> [Int]
+  private static func cluster(data: Tensor, centerCount: Int, iters: Int = 50) async throws -> [Int]
   {
     var centers = data[stride(from: 0, to: data.shape[0], by: data.shape[0] / centerCount)]
 

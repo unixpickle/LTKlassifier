@@ -1,51 +1,48 @@
-document.addEventListener("DOMContentLoaded", async function () {
-    const imageGrid = document.getElementById("imageGrid");
-    const dropdown = document.getElementById("detailDropdown");
-
-    async function fetchJSON(url) {
-        const response = await fetch(url);
-        return response.json();
+class App {
+    constructor() {
+        this.imageGrid = document.getElementById("image-grid");
+        this.dropdown = document.getElementById("detail-dropdown");
+        this.productHeading = document.getElementById("product-heading");
+        this.homeLink = document.getElementById("home-link");
+        this.neighbors = null;
     }
 
-    function getQueryParam(name) {
-        const params = new URLSearchParams(window.location.search);
-        return params.get(name);
-    }
-
-    async function loadGrid() {
+    async loadGrid() {
         const id = getQueryParam("id");
 
         if (id) {
-            // Load neighbors if an ID is provided
-            const neighbors = await fetchJSON(`/neighbors?id=${id}`);
+            this.neighbors = await fetchJSON(`/neighbors?id=${id}`);
+            this.createDetailDropdown();
 
-            // Create a dropdown for levels of detail
-            createDetailDropdown(neighbors);
+            this.createProductHeading(id);
 
-            // Load the default neighbor images (using the first key as default)
-            const defaultLevel = Object.keys(neighbors)[0];
-            updateNeighborGrid(neighbors, defaultLevel);
+            const defaultLevel = Object.keys(this.neighbors)[0];
+            this.updateNeighborGrid(defaultLevel);
 
-            // Add event listener to the dropdown to update the grid on change
-            dropdown.addEventListener("change", function () {
-                updateNeighborGrid(neighbors, dropdown.value);
+            this.dropdown.addEventListener("change", () => {
+                this.updateNeighborGrid(this.dropdown.value);
             });
         } else {
             // Load the first page of images
             const ids = await fetchJSON("/firstPage");
-            imageGrid.innerHTML = "";
-            ids.forEach(id => addImageToGrid(id, imageGrid));
+            this.imageGrid.innerHTML = "";
+            ids.forEach((id) => this.addImageToGrid(id));
+            this.homeLink.style.display = 'none';
         }
     }
 
-    function addImageToGrid(id, container) {
+    addImageToGrid(id) {
         const imageContainer = document.createElement("div");
         imageContainer.classList.add("image-container");
+
+        const zoomLink = document.createElement("a");
+        zoomLink.href = `?id=${id}`;
+        zoomLink.className = 'zoom-link';
 
         const img = document.createElement("img");
         img.src = `/productImage?id=${id}`;
         img.dataset.id = id;
-        img.addEventListener("click", () => zoomIntoID(id));
+        zoomLink.append(img);
 
         const link = document.createElement("a");
         link.href = `/productRedirect?id=${id}`;
@@ -54,30 +51,52 @@ document.addEventListener("DOMContentLoaded", async function () {
         link.target = "_blank"; // Opens in a new tab
         link.rel = "noopener noreferrer"; // Security best practice
 
-        imageContainer.appendChild(img);
+        imageContainer.appendChild(zoomLink);
         imageContainer.appendChild(link);
-        container.appendChild(imageContainer);
+        this.imageGrid.appendChild(imageContainer);
     }
 
-    function zoomIntoID(id) {
-        window.location = `?id=${id}`;
-    }
-
-    function createDetailDropdown(neighbors) {
-        dropdown.innerHTML = "";
-        Object.keys(neighbors).forEach(level => {
+    createDetailDropdown() {
+        this.dropdown.innerHTML = "";
+        Object.keys(this.neighbors).forEach(level => {
             const option = document.createElement("option");
             option.value = level;
             option.textContent = `Detail Level: ${level}`;
-            dropdown.appendChild(option);
+            this.dropdown.appendChild(option);
         });
-        dropdown.style.display = '';
+        this.dropdown.style.display = '';
     }
 
-    function updateNeighborGrid(neighbors, level) {
-        imageGrid.innerHTML = "";
-        neighbors[level].forEach(id => addImageToGrid(id, imageGrid));
+    async createProductHeading(id) {
+        const img = this.productHeading.getElementsByClassName('image')[0];
+        img.src = `/productImage?id=${id}`;
+
+        const title = this.productHeading.getElementsByClassName('title')[0];
+        title.href = `/productRedirect?id=${id}`;
+        title.innerText = 'Unknown product name';
+
+        this.productHeading.style = '';
+        let name = await (await fetch(`/productName?id=${id}`)).text();
+        title.innerText = name;
     }
 
-    loadGrid();
+    updateNeighborGrid(level) {
+        this.imageGrid.innerHTML = "";
+        this.neighbors[level].forEach((id) => this.addImageToGrid(id));
+    }
+}
+
+async function fetchJSON(url) {
+    const response = await fetch(url);
+    return response.json();
+}
+
+function getQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    window.app = new App();
+    window.app.loadGrid();
 });

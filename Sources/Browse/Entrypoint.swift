@@ -79,6 +79,7 @@ public struct Server {
     neighbors = try await Neighbors(featureDir: featureDir, clusterPath: clusterPath)
 
     setupImageRoute()
+    setupNameRoute()
     setupRedirectRoute()
     setupNeighborRoutes()
   }
@@ -110,13 +111,35 @@ public struct Server {
       guard let productID = request.query[String.self, at: "id"] else {
         return Response(status: .badRequest)
       }
-      guard let imageData = try? db.getProductImage(id: productID) else {
+      let imageData = await withCheckedContinuation { continuation in
+        DispatchQueue.global().async {
+          continuation.resume(returning: try? db.getProductImage(id: productID))
+        }
+      }
+      guard let imageData = imageData else {
         return Response(status: .notFound)
       }
       return Response(
         status: .ok,
         headers: ["content-type": "image/jpeg"],
         body: .init(data: imageData)
+      )
+    }
+  }
+
+  func setupNameRoute() {
+    let db = db!
+    app.on(.GET, "productName") { request -> Response in
+      guard let productID = request.query[String.self, at: "id"] else {
+        return Response(status: .badRequest)
+      }
+      guard let row = try? db.getProduct(id: productID) else {
+        return Response(status: .notFound)
+      }
+      return Response(
+        status: .ok,
+        headers: ["content-type": "text/plain"],
+        body: .init(data: (row[db.fields.name] ?? "<unknown name>").data(using: .utf8) ?? Data())
       )
     }
   }
