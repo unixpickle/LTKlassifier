@@ -23,8 +23,6 @@ enum ServerError: Error {
     String = "features"
   @ArgumentParser.Option(name: .long, help: "Path to save clusters.") var clusterPath: String =
     "clusters.plist"
-  @ArgumentParser.Option(name: .long, help: "Path to save clusters.") var duplicatesPath: String =
-    "duplicates.plist"
 
   mutating func run() async {
     do {
@@ -33,8 +31,7 @@ enum ServerError: Error {
         dbPath: dbPath,
         modelPath: modelPath,
         featureDir: featureDir,
-        clusterPath: clusterPath,
-        duplicatesPath: duplicatesPath
+        clusterPath: clusterPath
       )
       try await server.setup()
       try await server.app.execute()
@@ -52,7 +49,6 @@ public struct Server {
   var modelPath: String
   var featureDir: String
   var clusterPath: String
-  var duplicatesPath: String
 
   var app: Application! = nil
   var db: DB! = nil
@@ -80,11 +76,7 @@ public struct Server {
     db = DB(pool: ConnectionPool(path: dbPath))
 
     print("creating neighbors...")
-    neighbors = try await Neighbors(
-      featureDir: featureDir,
-      clusterPath: clusterPath,
-      duplicatesPath: duplicatesPath
-    )
+    neighbors = try await Neighbors(featureDir: featureDir, clusterPath: clusterPath)
 
     setupImageRoute()
     setupNameRoute()

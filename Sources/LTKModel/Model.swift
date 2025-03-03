@@ -7,9 +7,7 @@ public class Model: Trainable {
   @Child public var backbone: MobileNetV2
   @Child public var prediction: PredictionLayer
 
-  public var featureCount: Int {
-    backbone.outConv.conv.weight.shape[0]
-  }
+  public var featureCount: Int { backbone.outConv.conv.weight.shape[0] }
 
   public init(labels: [Field: LabelDescriptor], featureCount: Int = 1280) {
     super.init()
@@ -39,8 +37,12 @@ public class Model: Trainable {
     let newShape = backbone.outConv.conv.weight.shape
     let oldShape = weight.shape
     if oldShape != newShape {
+      let backboneMode = backbone.mode
+      let predictionMode = prediction.mode
       backbone = MobileNetV2(inCount: 3, featureCount: oldShape[0])
       prediction = PredictionLayer(inputCount: oldShape[0], labels: prediction.labels)
+      backbone.mode = backboneMode
+      prediction.mode = predictionMode
     }
     try loadState(state)
   }
