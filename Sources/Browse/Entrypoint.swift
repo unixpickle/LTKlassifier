@@ -111,9 +111,18 @@ public struct Server {
       guard let productID = request.query[String.self, at: "id"] else {
         return Response(status: .badRequest)
       }
-      let imageData = await withCheckedContinuation { continuation in
+      let isPreview = (request.query[String.self, at: "preview"] ?? "0") == "1"
+      let imageData: Data? = await withCheckedContinuation { continuation in
         DispatchQueue.global().async {
-          continuation.resume(returning: try? db.getProductImage(id: productID))
+          guard let rawData = try? db.getProductImage(id: productID) else {
+            continuation.resume(returning: nil)
+            return
+          }
+          if isPreview, let shrunk = shrinkImage(rawData, maxSideLength: 400) {
+            continuation.resume(returning: shrunk)
+          } else {
+            continuation.resume(returning: rawData)
+          }
         }
       }
       guard let imageData = imageData else { return Response(status: .notFound) }

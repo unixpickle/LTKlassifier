@@ -12,18 +12,31 @@
         }
 
         #product-heading {
-            text-align: center;
-            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            margin: 10px auto;
+            gap: 10px;
+            width: 300px;
+            padding: 10px;
+            background-color: #f0f0f0;
         }
 
         #product-heading .image {
-            height: 100px;
+            max-width: 100px;
+            max-height: 100px;
+        }
+
+        #product-heading .fields {
+            width: 200px;
+        }
+
+        #product-heading .field > label {
+            font-size: 0.8em;
+            font-weight: bolder;
         }
 
         #product-heading .title {
             display: block;
-            max-width: 300px;
-            text-align: center;
             margin: auto;
             color: #555;
             text-decoration: none;
@@ -60,12 +73,66 @@
             }
         }
 
-        /* Styling for the dropdown */
-        #detail-dropdown {
-            margin-bottom: 15px;
-            padding: 5px;
-            font-size: 16px;
+        #detail-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
         }
+
+        #detail-label {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        #detail-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .detail-button {
+            width: 40px; /* All buttons same size */
+            height: 40px;
+            border: none;
+            background-color: #d5d5d5; /* Default color */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px; /* Slightly rounded squares */
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .detail-button .dot {
+            background-color: black; /* Dots always black */
+            border-radius: 50%;
+        }
+        .detail-button .dot-1 {
+            width: 5px;
+            height: 5px;
+        }
+        .detail-button .dot-2 {
+            width: 10px;
+            height: 10px;
+        }
+        .detail-button .dot-3 {
+            width: 15px;
+            height: 15px;
+        }
+        .detail-button .dot-4 {
+            width: 20px;
+            height: 20px;
+        }
+        .detail-button .dot-5 {
+            width: 25px;
+            height: 25px;
+        }
+
+        /* Selected button changes color */
+        .detail-button.selected {
+            background-color: #65bcd4;
+        }
+
 
         .image-container {
             position: relative;
@@ -102,10 +169,24 @@
     <a id="home-link" href="/">Start over</a>
     <div id="product-heading" style="display: none;">
         <img class="image">
-        <a class="title"></a>
+        <div class="fields">
+            <div class="field">
+                <label>Product name</label>
+                <a class="title"></a>
+            </div>
+        </div>
     </div>
 
-    <select id="detail-dropdown" style="display: none;"></select>
+    <div id="detail-container" style="display: none">
+        <div id="detail-label">Variety</div>
+        <div id="detail-buttons">
+            <button class="detail-button selected" data-level="1"><div class="dot dot-1"></div></button>
+            <button class="detail-button" data-level="64"><div class="dot dot-2"></div></button>
+            <button class="detail-button" data-level="256"><div class="dot dot-3"></div></button>
+            <button class="detail-button" data-level="1024"><div class="dot dot-4"></div></button>
+            <button class="detail-button" data-level="4096"><div class="dot dot-5"></div></button>
+        </div>
+    </div>
 
     <div class="grid" id="image-grid"></div>
 

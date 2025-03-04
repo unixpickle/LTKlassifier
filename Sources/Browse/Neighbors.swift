@@ -54,7 +54,7 @@ public final class Neighbors: Sendable {
     self.ids = ids
   }
 
-  public func neighbors(id: String, strides: [Int], limit: Int = 128, dedupThreshold: Float = 0.01)
+  public func neighbors(id: String, strides: [Int], limit: Int = 128, dedupThreshold: Float = 0.02)
     async throws -> [Int: [String]]
   {
     guard let sourceIdx = ids.firstIndex(of: id) else { throw NeighborError.idNotFound(id) }

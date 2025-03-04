@@ -1,7 +1,6 @@
 class App {
     constructor() {
         this.imageGrid = document.getElementById("image-grid");
-        this.dropdown = document.getElementById("detail-dropdown");
         this.productHeading = document.getElementById("product-heading");
         this.homeLink = document.getElementById("home-link");
         this.neighbors = null;
@@ -18,10 +17,6 @@ class App {
 
             const defaultLevel = Object.keys(this.neighbors)[0];
             this.updateNeighborGrid(defaultLevel);
-
-            this.dropdown.addEventListener("change", () => {
-                this.updateNeighborGrid(this.dropdown.value);
-            });
         } else {
             // Load the first page of images
             const ids = await fetchJSON("/firstPage");
@@ -40,7 +35,7 @@ class App {
         zoomLink.className = 'zoom-link';
 
         const img = document.createElement("img");
-        img.src = `/productImage?id=${id}`;
+        img.src = `/productImage?id=${id}&preview=1`;
         img.dataset.id = id;
         zoomLink.append(img);
 
@@ -57,14 +52,16 @@ class App {
     }
 
     createDetailDropdown() {
-        this.dropdown.innerHTML = "";
-        Object.keys(this.neighbors).forEach(level => {
-            const option = document.createElement("option");
-            option.value = level;
-            option.textContent = `Detail Level: ${level}`;
-            this.dropdown.appendChild(option);
+        document.getElementById('detail-container').style.display = '';
+        document.querySelectorAll(".detail-button").forEach(button => {
+            button.addEventListener("click", () => {
+                document.querySelectorAll(".detail-button").forEach(btn => btn.classList.remove("selected"));
+                button.classList.add("selected");
+
+                const level = button.getAttribute("data-level");
+                this.updateNeighborGrid(level);
+            });
         });
-        this.dropdown.style.display = '';
     }
 
     async createProductHeading(id) {
