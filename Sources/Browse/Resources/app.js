@@ -11,9 +11,10 @@ class App {
 
         if (id) {
             this.neighbors = await fetchJSON(`/neighbors?id=${id}`);
-            this.createDetailDropdown();
+            this.homeLink.style.display = '';
 
-            this.createProductHeading(id);
+            await this.createProductHeading(id);
+            this.createDetailDropdown();
 
             const defaultLevel = Object.keys(this.neighbors)[0];
             this.updateNeighborGrid(defaultLevel);
@@ -22,8 +23,8 @@ class App {
             const ids = await fetchJSON("/firstPage");
             this.imageGrid.innerHTML = "";
             ids.forEach((id) => this.addImageToGrid(id));
-            this.homeLink.style.display = 'none';
         }
+        document.getElementsByClassName('back-to-top')[0].style.display = '';
     }
 
     addImageToGrid(id) {
@@ -65,16 +66,30 @@ class App {
     }
 
     async createProductHeading(id) {
+        let info = await fetchJSON(`/productInfo?id=${id}`);
+
         const img = this.productHeading.getElementsByClassName('image')[0];
         img.src = `/productImage?id=${id}`;
 
-        const title = this.productHeading.getElementsByClassName('title')[0];
+        const title = this.productHeading.getElementsByClassName('product-name')[0];
         title.href = `/productRedirect?id=${id}`;
-        title.innerText = 'Unknown product name';
+        title.innerText = info.name || 'Unknown product name';
+
+        if (info.retailer) {
+          const container = document.getElementsByClassName('field-retailer')[0];
+          container.style.display = '';
+          let value = container.getElementsByClassName('field-value')[0];
+          value.textContent = info.retailer;
+        }
+
+        if (info.price) {
+          const container = document.getElementsByClassName('field-price')[0];
+          container.style.display = '';
+          let value = container.getElementsByClassName('field-value')[0];
+          value.textContent = '$' + info.price.toFixed(2);
+        }
 
         this.productHeading.style = '';
-        let name = await (await fetch(`/productName?id=${id}`)).text();
-        title.innerText = name;
     }
 
     updateNeighborGrid(level) {
@@ -91,6 +106,10 @@ async function fetchJSON(url) {
 function getQueryParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name);
+}
+
+function scrollToTop() {
+    document.body.scrollTop = document.documentElement.scrollTop = 0;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

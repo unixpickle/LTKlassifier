@@ -9,6 +9,7 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            color: #555;
         }
 
         #product-heading {
@@ -27,19 +28,32 @@
         }
 
         #product-heading .fields {
-            width: 200px;
+            flex: 1;
         }
 
-        #product-heading .field > label {
+
+        #product-heading .field {
+            margin-top: 10px;
+        }
+
+        #product-heading .field > .name {
             font-size: 0.8em;
             font-weight: bolder;
+            display: block;
         }
 
-        #product-heading .title {
+        #product-heading .field-value {
             display: block;
+        }
+
+        #product-heading .product-name {
             margin: auto;
-            color: #555;
             text-decoration: none;
+            color: #555;
+        }
+
+        #product-heading .product-name:hover {
+            color: #999;
         }
 
         .grid {
@@ -77,7 +91,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-top: 10px;
+            margin: 10px auto;
         }
 
         #detail-label {
@@ -161,18 +175,44 @@
             color: #555;
             display: block;
             text-align: center;
+            text-decoration: none;
+        }
+
+        #home-link:hover {
+            color: #999;
+        }
+
+        .back-to-top {
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.3em;
+            background-color: #d5d5d5;
+            cursor: pointer;
+            color: #555;
+        }
+
+        .back-to-top:hover {
+            background-color: #65bcd4;
         }
     </style>
 </head>
 
 <body>
-    <a id="home-link" href="/">Start over</a>
-    <div id="product-heading" style="display: none;">
+    <a id="home-link" href="/" style="display: none">&larr; Start over</a>
+    <div id="product-heading" style="display: none">
         <img class="image">
         <div class="fields">
-            <div class="field">
-                <label>Product name</label>
-                <a class="title"></a>
+            <div class="field" style="margin-top: 0px">
+                <label class="name">Product name</label>
+                <a class="product-name"></a>
+            </div>
+            <div class="field field-retailer" style="display: none">
+                <label class="name">Retailer</label>
+                <label class="field-value"></label>
+            </div>
+            <div class="field field-price" style="display: none">
+                <label class="name">Price</label>
+                <label class="field-value"></label>
             </div>
         </div>
     </div>
@@ -191,6 +231,8 @@
     <div class="grid" id="image-grid"></div>
 
     <script src="app.js"></script>
+
+    <button class="back-to-top" onclick="scrollToTop()" style="display: none">&uarr; Back to top</button>
 
 </body>
 

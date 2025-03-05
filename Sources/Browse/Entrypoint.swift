@@ -136,15 +136,25 @@ public struct Server {
 
   func setupNameRoute() {
     let db = db!
-    app.on(.GET, "productName") { request -> Response in
+    app.on(.GET, "productInfo") { request -> Response in
       guard let productID = request.query[String.self, at: "id"] else {
         return Response(status: .badRequest)
       }
       guard let row = try? db.getProduct(id: productID) else { return Response(status: .notFound) }
+      struct Result: Codable {
+        let name: String?
+        let price: Double?
+        let retailer: String?
+      }
+      let results = Result(
+        name: row[db.fields.name],
+        price: try? db.productDollarAmount(row),
+        retailer: row[db.fields.retailerDisplayName]
+      )
       return Response(
         status: .ok,
-        headers: ["content-type": "text/plain"],
-        body: .init(data: (row[db.fields.name] ?? "<unknown name>").data(using: .utf8) ?? Data())
+        headers: ["content-type": "application/json"],
+        body: .init(data: try! JSONEncoder().encode(results))
       )
     }
   }
