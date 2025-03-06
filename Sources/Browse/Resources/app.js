@@ -4,56 +4,72 @@ class App {
         this.productHeading = document.getElementById("product-heading");
         this.homeLink = document.getElementById("home-link");
         this.neighbors = null;
+        this.prices = {};
     }
 
     async loadGrid() {
-        const id = getQueryParam("id");
-
-        if (id) {
-            this.neighbors = await fetchJSON(`/neighbors?id=${id}`);
-            this.homeLink.style.display = '';
-
-            await this.createProductHeading(id);
-            this.createDetailDropdown();
-
-            const defaultLevel = Object.keys(this.neighbors)[0];
-            this.updateNeighborGrid(defaultLevel);
-        } else {
-            // Load the first page of images
-            const ids = await fetchJSON("/firstPage");
-            this.imageGrid.innerHTML = "";
-            ids.forEach((id) => this.addImageToGrid(id));
+        try {
+            const id = getQueryParam("id");
+            if (id) {
+                await this.loadNeighborGrid(id);
+            } else {
+                await this.loadFirstPage();
+            }
+            document.body.classList.remove('loading');
+        } catch (e) {
+            document.body.classList.add('fatal-error');
+            document.getElementById('error-message').textContent = '' + e;
         }
-        document.getElementsByClassName('back-to-top')[0].style.display = '';
+    }
+
+    async loadFirstPage() {
+        const response = await fetchJSON("/firstPage");
+        const ids = response.ids;
+        this.prices = response.prices;
+        this.imageGrid.innerHTML = "";
+        ids.forEach((id) => this.addImageToGrid(id));
+    }
+
+    async loadNeighborGrid(id) {
+        const response = await fetchJSON(`/neighbors?id=${id}`);
+        this.neighbors = response.neighbors;
+        this.prices = response.prices;
+
+        await this.createProductHeading(id);
+        this.createDetailDropdown();
+
+        const defaultLevel = Object.keys(this.neighbors)[0];
+        this.updateNeighborGrid(defaultLevel);
+
+        document.body.classList.add('product-page');
     }
 
     addImageToGrid(id) {
         const imageContainer = document.createElement("div");
         imageContainer.classList.add("image-container");
 
-        const zoomLink = document.createElement("a");
-        zoomLink.href = `?id=${id}`;
-        zoomLink.className = 'zoom-link';
+        const outerLink = document.createElement("a");
+        outerLink.href = `?id=${id}`;
+        outerLink.className = 'product-page-link';
 
         const img = document.createElement("img");
         img.src = `/productImage?id=${id}&preview=1`;
         img.dataset.id = id;
-        zoomLink.append(img);
+        outerLink.append(img);
 
-        const link = document.createElement("a");
-        link.href = `/productRedirect?id=${id}`;
-        link.classList.add("image-link");
-        link.textContent = "🔗"; // You can replace this with an icon or text
-        link.target = "_blank"; // Opens in a new tab
-        link.rel = "noopener noreferrer"; // Security best practice
+        imageContainer.appendChild(outerLink);
 
-        imageContainer.appendChild(zoomLink);
-        imageContainer.appendChild(link);
+        if (this.prices[id]) {
+            const price = document.createElement("div");
+            price.classList.add('product-price-blurb');
+            price.textContent = "$" + Math.round(this.prices[id]);
+            imageContainer.appendChild(price);
+        }
+
         this.imageGrid.appendChild(imageContainer);
     }
 
     createDetailDropdown() {
-        document.getElementById('detail-container').style.display = '';
         document.querySelectorAll(".detail-button").forEach(button => {
             button.addEventListener("click", () => {
                 document.querySelectorAll(".detail-button").forEach(btn => btn.classList.remove("selected"));
@@ -76,17 +92,17 @@ class App {
         title.innerText = info.name || 'Unknown product name';
 
         if (info.retailer) {
-          const container = document.getElementsByClassName('field-retailer')[0];
-          container.style.display = '';
-          let value = container.getElementsByClassName('field-value')[0];
-          value.textContent = info.retailer;
+            const container = document.getElementsByClassName('field-retailer')[0];
+            container.style.display = '';
+            let value = container.getElementsByClassName('field-value')[0];
+            value.textContent = info.retailer;
         }
 
         if (info.price) {
-          const container = document.getElementsByClassName('field-price')[0];
-          container.style.display = '';
-          let value = container.getElementsByClassName('field-value')[0];
-          value.textContent = '$' + info.price.toFixed(2);
+            const container = document.getElementsByClassName('field-price')[0];
+            container.style.display = '';
+            let value = container.getElementsByClassName('field-value')[0];
+            value.textContent = '$' + info.price.toFixed(2);
         }
 
         this.productHeading.style = '';
@@ -100,6 +116,9 @@ class App {
 
 async function fetchJSON(url) {
     const response = await fetch(url);
+    if (response.status == 403) {
+        throw 'Permission denied. Perhaps the rate limit was exceeded?';
+    }
     return response.json();
 }
 

@@ -75,6 +75,20 @@ public final class DB: Sendable {
     }
   }
 
+  public func getProductPrices(ids: [String]? = nil, connection: Connection? = nil) throws
+    -> [String: Double]
+  {
+    try withConnection(connection) { connection in
+      var result = [String: Double]()
+      var query = tables.products.select([fields.id, fields.price, fields.currency])
+      if let ids = ids { query = query.filter(ids.contains(fields.id)) }
+      for row in try connection.prepare(query).makeIterator() {
+        if let price = try? productDollarAmount(row) { result[row[fields.id]] = price }
+      }
+      return result
+    }
+  }
+
   public func productDollarAmount(_ row: Row) throws -> Double? {
     guard let price = row[fields.price], let currencyName = row[fields.currency],
       let currency = Currency.parse(currencyName)

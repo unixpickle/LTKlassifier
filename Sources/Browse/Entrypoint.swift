@@ -23,6 +23,15 @@ enum ServerError: Error {
     String = "features"
   @ArgumentParser.Option(name: .long, help: "Path to save clusters.") var clusterPath: String =
     "clusters.plist"
+  // Rate limiting
+  @ArgumentParser.Option(
+    name: .long,
+    help: "Number of reverse proxies that this server sits behind."
+  ) var proxyCount: Int = 0
+  @ArgumentParser.Option(
+    name: .long,
+    help: "Maximum number of calls to the neighbors endpoint in an hour."
+  ) var maxNeighborsPerHour: Int = 1000
 
   mutating func run() async {
     do {
@@ -31,7 +40,9 @@ enum ServerError: Error {
         dbPath: dbPath,
         modelPath: modelPath,
         featureDir: featureDir,
-        clusterPath: clusterPath
+        clusterPath: clusterPath,
+        proxyCount: proxyCount,
+        maxNeighborsPerHour: maxNeighborsPerHour
       )
       try await server.setup()
       try await server.app.execute()
@@ -49,12 +60,18 @@ public struct Server {
   var modelPath: String
   var featureDir: String
   var clusterPath: String
+  var proxyCount: Int
+  var maxNeighborsPerHour: Int
 
   var app: Application! = nil
   var db: DB! = nil
   var neighbors: Neighbors! = nil
+  var neighborRateLimiter: RateLimiter! = nil
+  var allPrices: [String: Double]! = nil
 
   mutating func setup() async throws {
+    neighborRateLimiter = await RateLimiter(maxPerHour: Double(maxNeighborsPerHour))
+
     app = try await Application.make(.detect(arguments: ["browse"]))
     app.http.server.configuration.hostname = "0.0.0.0"
     app.http.server.configuration.port = port
@@ -75,6 +92,9 @@ public struct Server {
     print("creating DB...")
     db = DB(pool: ConnectionPool(path: dbPath))
 
+    print("listing all prices...")
+    allPrices = try db.getProductPrices()
+
     print("creating neighbors...")
     neighbors = try await Neighbors(featureDir: featureDir, clusterPath: clusterPath)
 
@@ -84,9 +104,23 @@ public struct Server {
     setupNeighborRoutes()
   }
 
+  var getRemoteHost: @Sendable (Request) -> String {
+    { [proxyCount] request in
+      if proxyCount == 0 { return request.remoteAddress?.ipAddress ?? "" }
+      let forwarded = (request.headers["X-Forwarded-For"]).flatMap {
+        $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+      }
+      if forwarded.count < proxyCount {
+        print("invalid number of proxies")
+        return forwarded.first ?? ""
+      }
+      return forwarded[forwarded.count - proxyCount]
+    }
+  }
+
   func setupFileRoutes() throws {
-    let filenames = ["index.html", "app.js"]
-    let contentTypes = ["html": "text/html", "js": "text/javascript"]
+    let filenames = ["index.html", "app.js", "style.css"]
+    let contentTypes = ["html": "text/html", "js": "text/javascript", "css": "text/css"]
     for filename in filenames {
       let parts = filename.split(separator: ".")
       guard
@@ -175,12 +209,26 @@ public struct Server {
 
   func setupNeighborRoutes() {
     let neighbors = neighbors!
+    let allPrices = allPrices!
+    let rateLimiter = neighborRateLimiter!
+    let getRemoteHost = getRemoteHost
+
+    @Sendable func getPrices(_ ids: some Collection<String>) -> [String: Double] {
+      var results = [String: Double]()
+      for id in ids { if let price = allPrices[id] { results[id] = price } }
+      return results
+    }
 
     app.on(.GET, "firstPage") { request -> Response in
+      struct Result: Codable {
+        let ids: [String]
+        let prices: [String: Double]
+      }
+      let resp = Result(ids: neighbors.clusterStart, prices: getPrices(neighbors.clusterStart))
       return Response(
         status: .ok,
         headers: ["content-type": "application/json"],
-        body: .init(data: try! JSONEncoder().encode(neighbors.clusterStart))
+        body: .init(data: try! JSONEncoder().encode(resp))
       )
     }
 
@@ -188,15 +236,19 @@ public struct Server {
       guard let productID = request.query[String.self, at: "id"] else {
         return Response(status: .badRequest)
       }
+      let host = getRemoteHost(request)
+      if !(await rateLimiter.use(host: host)) { return Response(status: .forbidden) }
       do {
-        let results = try await neighbors.neighbors(
-          id: productID,
-          strides: [1, 64, 256, 1024, 4096]
-        )
+        let n = try await neighbors.neighbors(id: productID, strides: [1, 64, 256, 1024, 4096])
+        struct Result: Codable {
+          let neighbors: [Int: [String]]
+          let prices: [String: Double]
+        }
+        let resp = Result(neighbors: n, prices: getPrices(Set(n.values.flatMap { $0 })))
         return Response(
           status: .ok,
           headers: ["content-type": "application/json"],
-          body: .init(data: try! JSONEncoder().encode(results))
+          body: .init(data: try! JSONEncoder().encode(resp))
         )
       } catch { return Response(status: .badRequest) }
     }

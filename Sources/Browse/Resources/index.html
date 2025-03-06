@@ -4,202 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Products</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            color: #555;
-        }
-
-        #product-heading {
-            display: flex;
-            align-items: center;
-            margin: 10px auto;
-            gap: 10px;
-            width: 300px;
-            padding: 10px;
-            background-color: #f0f0f0;
-        }
-
-        #product-heading .image {
-            max-width: 100px;
-            max-height: 100px;
-        }
-
-        #product-heading .fields {
-            flex: 1;
-        }
-
-
-        #product-heading .field {
-            margin-top: 10px;
-        }
-
-        #product-heading .field > .name {
-            font-size: 0.8em;
-            font-weight: bolder;
-            display: block;
-        }
-
-        #product-heading .field-value {
-            display: block;
-        }
-
-        #product-heading .product-name {
-            margin: auto;
-            text-decoration: none;
-            color: #555;
-        }
-
-        #product-heading .product-name:hover {
-            color: #999;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, 200px);
-            gap: 10px;
-            padding: 10px;
-            align-items: center;
-        }
-
-        .grid .zoom-link {
-            width: 100%;
-        }
-
-        .grid .zoom-link img {
-            max-width: 200px;
-            max-height: 200px;
-        }
-
-        @media (max-width: 500px) {
-            .grid {
-              grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            }
-            .grid .zoom-link img {
-                max-width: 150px;
-                max-height: 150px;
-            }
-            .image-container {
-                width: 150px;
-                height: 150px;
-            }
-        }
-
-        #detail-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 10px auto;
-        }
-
-        #detail-label {
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-
-        #detail-buttons {
-            display: flex;
-            gap: 10px;
-        }
-
-        .detail-button {
-            width: 40px; /* All buttons same size */
-            height: 40px;
-            border: none;
-            background-color: #d5d5d5; /* Default color */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 5px; /* Slightly rounded squares */
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out;
-        }
-
-        .detail-button .dot {
-            background-color: black; /* Dots always black */
-            border-radius: 50%;
-        }
-        .detail-button .dot-1 {
-            width: 5px;
-            height: 5px;
-        }
-        .detail-button .dot-2 {
-            width: 10px;
-            height: 10px;
-        }
-        .detail-button .dot-3 {
-            width: 15px;
-            height: 15px;
-        }
-        .detail-button .dot-4 {
-            width: 20px;
-            height: 20px;
-        }
-        .detail-button .dot-5 {
-            width: 25px;
-            height: 25px;
-        }
-
-        /* Selected button changes color */
-        .detail-button.selected {
-            background-color: #65bcd4;
-        }
-
-
-        .image-container {
-            position: relative;
-            display: inline-block;
-            width: 200px;
-            height: 200px;
-        }
-
-        .image-link {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            text-decoration: none;
-            font-size: 12px;
-            padding: 5px;
-            border-radius: 5px;
-        }
-
-        .image-link:hover {
-            background-color: rgba(0, 0, 0, 1.0);
-        }
-
-        #home-link {
-            color: #555;
-            display: block;
-            text-align: center;
-            text-decoration: none;
-        }
-
-        #home-link:hover {
-            color: #999;
-        }
-
-        .back-to-top {
-            border: none;
-            padding: 10px 20px;
-            font-size: 1.3em;
-            background-color: #d5d5d5;
-            cursor: pointer;
-            color: #555;
-        }
-
-        .back-to-top:hover {
-            background-color: #65bcd4;
-        }
-    </style>
+    <title>Vibewall</title>
+    <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 
-<body>
-    <a id="home-link" href="/" style="display: none">&larr; Start over</a>
-    <div id="product-heading" style="display: none">
+<body class="loading">
+    <a id="home-link" href="/">&larr; Start over</a>
+    <div id="product-heading">
         <img class="image">
         <div class="fields">
             <div class="field" style="margin-top: 0px">
@@ -217,14 +28,24 @@
         </div>
     </div>
 
-    <div id="detail-container" style="display: none">
+    <div id="detail-container">
         <div id="detail-label">Variety</div>
         <div id="detail-buttons">
-            <button class="detail-button selected" data-level="1"><div class="dot dot-1"></div></button>
-            <button class="detail-button" data-level="64"><div class="dot dot-2"></div></button>
-            <button class="detail-button" data-level="256"><div class="dot dot-3"></div></button>
-            <button class="detail-button" data-level="1024"><div class="dot dot-4"></div></button>
-            <button class="detail-button" data-level="4096"><div class="dot dot-5"></div></button>
+            <button class="detail-button selected" data-level="1">
+                <div class="dot dot-1"></div>
+            </button>
+            <button class="detail-button" data-level="64">
+                <div class="dot dot-2"></div>
+            </button>
+            <button class="detail-button" data-level="256">
+                <div class="dot dot-3"></div>
+            </button>
+            <button class="detail-button" data-level="1024">
+                <div class="dot dot-4"></div>
+            </button>
+            <button class="detail-button" data-level="4096">
+                <div class="dot dot-5"></div>
+            </button>
         </div>
     </div>
 
@@ -232,7 +53,14 @@
 
     <script src="app.js"></script>
 
-    <button class="back-to-top" onclick="scrollToTop()" style="display: none">&uarr; Back to top</button>
+    <button id="back-to-top" onclick="scrollToTop()">&uarr; Back to top</button>
+
+    <div id="fatal-error">
+        <label class="heading">An error has occurred while loading the content.</label>
+        <label id="error-message"></label>
+    </div>
+
+    <div id="loader">⏳ Loading</div>
 
 </body>
 
