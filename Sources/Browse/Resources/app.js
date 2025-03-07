@@ -10,10 +10,13 @@ class App {
     async loadGrid() {
         try {
             const id = getQueryParam("id");
+            const keyword = getQueryParam("keyword");
             if (id) {
                 await this.loadNeighborGrid(id);
+            } else if (keyword) {
+                await this.loadKeywordGrid(keyword);
             } else {
-                await this.loadFirstPage();
+                await this.loadStartPage();
             }
             document.body.classList.remove('loading');
         } catch (e) {
@@ -22,12 +25,23 @@ class App {
         }
     }
 
-    async loadFirstPage() {
+    async loadStartPage() {
         const response = await fetchJSON("/firstPage");
         const ids = response.ids;
         this.prices = response.prices;
         this.imageGrid.innerHTML = "";
         ids.forEach((id) => this.addImageToGrid(id));
+
+        const keywordContainer = document.getElementById('keyword-list');
+        KEYWORDS.forEach((keyword) => {
+            const link = document.createElement('a');
+            link.classList.add('keyword-item');
+            link.href = `?keyword=${encodeURIComponent(keyword)}`;
+            link.textContent = keyword;
+            keywordContainer.appendChild(link);
+        });
+
+        document.body.classList.add('start-page');
     }
 
     async loadNeighborGrid(id) {
@@ -36,12 +50,26 @@ class App {
         this.prices = response.prices;
 
         await this.createProductHeading(id);
-        this.createDetailDropdown();
+        this.createVarietyDropdown();
 
         const defaultLevel = Object.keys(this.neighbors)[0];
         this.updateNeighborGrid(defaultLevel);
 
         document.body.classList.add('product-page');
+    }
+
+    async loadKeywordGrid(keyword) {
+        const response = await fetchJSON(`/neighbors?keyword=${encodeURIComponent(keyword)}`);
+        this.neighbors = response.neighbors;
+        this.prices = response.prices;
+
+        document.getElementById('keyword-heading-label').textContent = keyword;
+        this.createVarietyDropdown();
+
+        const defaultLevel = Object.keys(this.neighbors)[0];
+        this.updateNeighborGrid(defaultLevel);
+
+        document.body.classList.add('keyword-page');
     }
 
     addImageToGrid(id) {
@@ -69,12 +97,13 @@ class App {
         this.imageGrid.appendChild(imageContainer);
     }
 
-    createDetailDropdown() {
-        document.querySelectorAll(".detail-button").forEach(button => {
+    createVarietyDropdown() {
+        document.querySelectorAll(".variety-button").forEach((button) => {
             button.addEventListener("click", () => {
-                document.querySelectorAll(".detail-button").forEach(btn => btn.classList.remove("selected"));
+                document.querySelectorAll(".variety-button").forEach((btn) => {
+                    btn.classList.remove("selected")
+                });
                 button.classList.add("selected");
-
                 const level = button.getAttribute("data-level");
                 this.updateNeighborGrid(level);
             });
@@ -135,3 +164,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.app = new App();
     window.app.loadGrid();
 });
+
+const KEYWORDS = [
+    "women's",
+    "men's",
+    "dress",
+    "bodycon",
+    "bag",
+    "top",
+    "earrings",
+    "necklace",
+    "bracelet",
+    "ring",
+    "leather",
+    "shoes",
+    "boots",
+    "heel",
+    "jacket",
+    "puffer",
+    "jeans",
+    "pants",
+    "skirt",
+    "pillow",
+    "cardigan",
+    "kids",
+    "sunglasses",
+    "socks",
+    "rug",
+    "sneakers",
+    "blazer",
+    "bra",
+    "tumbler",
+]

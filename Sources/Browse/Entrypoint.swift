@@ -23,6 +23,9 @@ enum ServerError: Error {
     String = "features"
   @ArgumentParser.Option(name: .long, help: "Path to save clusters.") var clusterPath: String =
     "clusters.plist"
+  @ArgumentParser.Flag(name: .long, help: "Only show products with prices.") var priceOnly: Bool =
+    false
+
   // Rate limiting
   @ArgumentParser.Option(
     name: .long,
@@ -41,6 +44,7 @@ enum ServerError: Error {
         modelPath: modelPath,
         featureDir: featureDir,
         clusterPath: clusterPath,
+        priceOnly: priceOnly,
         proxyCount: proxyCount,
         maxNeighborsPerHour: maxNeighborsPerHour
       )
@@ -60,6 +64,7 @@ public struct Server {
   var modelPath: String
   var featureDir: String
   var clusterPath: String
+  var priceOnly: Bool
   var proxyCount: Int
   var maxNeighborsPerHour: Int
 
@@ -96,7 +101,12 @@ public struct Server {
     allPrices = try db.getProductPrices()
 
     print("creating neighbors...")
-    neighbors = try await Neighbors(featureDir: featureDir, clusterPath: clusterPath)
+    neighbors = try await Neighbors(
+      model: model,
+      featureDir: featureDir,
+      clusterPath: clusterPath,
+      whitelist: (priceOnly ? Array(allPrices!.keys) : nil)
+    )
 
     setupImageRoute()
     setupNameRoute()
@@ -233,13 +243,19 @@ public struct Server {
     }
 
     app.on(.GET, "neighbors") { request -> Response in
-      guard let productID = request.query[String.self, at: "id"] else {
-        return Response(status: .badRequest)
-      }
+      let productID = request.query[String.self, at: "id"]
+      let keyword = request.query[String.self, at: "keyword"]
+      if productID == nil && keyword == nil { return Response(status: .badRequest) }
+
       let host = getRemoteHost(request)
       if !(await rateLimiter.use(host: host)) { return Response(status: .forbidden) }
       do {
-        let n = try await neighbors.neighbors(id: productID, strides: [1, 64, 256, 1024, 4096])
+        let n =
+          if let productID = productID {
+            try await neighbors.neighbors(id: productID, strides: [1, 64, 256, 1024, 4096])
+          } else if let keyword = keyword {
+            try await neighbors.neighbors(keyword: keyword, strides: [1, 64, 256, 1024, 4096])
+          } else { fatalError() }
         struct Result: Codable {
           let neighbors: [Int: [String]]
           let prices: [String: Double]

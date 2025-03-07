@@ -1,20 +1,30 @@
 import Foundation
 import Honeycrisp
+import LTKLabel
+import LTKModel
 
 public final class Neighbors: Sendable {
 
-  public enum NeighborError: Error { case idNotFound(String) }
+  public enum NeighborError: Error {
+    case idNotFound(String)
+    case keywordNotFound(String)
+  }
 
   struct FeatureShard: Codable {
     var ids: [String]
     var features: TensorState
   }
 
+  private let model: SyncTrainable<Model>
   private let ids: [String]
   private let features: Tensor
   public let clusterStart: [String]
 
-  public init(featureDir: String, clusterPath: String) async throws {
+  public init(model: sending Model, featureDir: String, clusterPath: String, whitelist: [String]?)
+    async throws
+  {
+    self.model = SyncTrainable(model)
+
     let decoder = PropertyListDecoder()
 
     print(" - loading features from \(featureDir) ...")
@@ -30,15 +40,24 @@ public final class Neighbors: Sendable {
       allIDs.append(contentsOf: shard.ids)
       try await allFeatures!.wait()
     }
-    let ids = allIDs
-    let features = allFeatures! / allFeatures!.pow(2).sum(axis: 1, keepdims: true).sqrt()
-    print(" - created feature matrix")
+    var ids = allIDs
+    var features = allFeatures! / allFeatures!.pow(2).sum(axis: 1, keepdims: true).sqrt()
+    print(" - created feature matrix with \(ids.count) features")
 
+    if let whitelist = whitelist {
+      let allowedIDs = Set(whitelist)
+      let useIndices = ids.enumerated().filter { allowedIDs.contains($0.1) }.map { $0.0 }
+      ids = useIndices.map { ids[$0] }
+      features = features.gather(axis: 0, indices: Tensor(data: useIndices))
+      print(" - filtered to \(ids.count) features")
+    }
+
+    var clusterStart: [String]
     if FileManager.default.fileExists(atPath: clusterPath) {
       let data = try Data(contentsOf: URL(filePath: clusterPath))
       clusterStart = try decoder.decode([String].self, from: data)
     } else {
-      print("clustering features...")
+      print(" - clustering features...")
       var totalCenters = [Int]()
       for centerCount in [16, 32, 64] {
         print(" - clustering for center count \(centerCount) ...")
@@ -50,6 +69,13 @@ public final class Neighbors: Sendable {
       let data = try PropertyListEncoder().encode(clusterStart)
       try data.write(to: URL(filePath: clusterPath), options: .atomic)
     }
+
+    if let whitelist = whitelist {
+      let allowedIDs = Set(whitelist)
+      clusterStart = clusterStart.filter { allowedIDs.contains($0) }
+    }
+
+    self.clusterStart = clusterStart
     self.features = features
     self.ids = ids
   }
@@ -59,7 +85,41 @@ public final class Neighbors: Sendable {
   {
     guard let sourceIdx = ids.firstIndex(of: id) else { throw NeighborError.idNotFound(id) }
     let sourceFeature = features[sourceIdx]
-    let distances = pairwiseDistances(features, sourceFeature.unsqueeze(axis: 0)).squeeze(axis: 1)
+    return try await neighbors(
+      feature: sourceFeature,
+      strides: strides,
+      limit: limit,
+      dedupThreshold: dedupThreshold
+    )
+  }
+
+  public func neighbors(
+    keyword: String,
+    strides: [Int],
+    limit: Int = 128,
+    dedupThreshold: Float = 0.02
+  ) async throws -> [Int: [String]] {
+    guard let keywordIdx = ProductKeyword.label(keyword) else {
+      throw NeighborError.keywordNotFound(keyword)
+    }
+    var sourceFeature = model.use {
+      $0.prediction.predictors.children[Field.productKeywords.rawValue]!.layer.weight.t()[
+        keywordIdx
+      ]
+    }
+    sourceFeature = sourceFeature / sourceFeature.pow(2).sum().sqrt()
+    return try await neighbors(
+      feature: sourceFeature,
+      strides: strides,
+      limit: limit,
+      dedupThreshold: dedupThreshold
+    )
+  }
+
+  private func neighbors(feature: Tensor, strides: [Int], limit: Int, dedupThreshold: Float)
+    async throws -> [Int: [String]]
+  {
+    let distances = pairwiseDistances(features, feature.unsqueeze(axis: 0)).squeeze(axis: 1)
     let sortedIdxs = distances.argsort(axis: 0)[1...]
     var results = [Int: [String]]()
     for s in strides {
@@ -69,7 +129,7 @@ public final class Neighbors: Sendable {
       // The first feature vector has the highest priority in the dedup, so we
       // make sure we won't show results that are duplicates of the query.
       let useFeatures = Tensor(concat: [
-        sourceFeature.unsqueeze(axis: 0), features.gather(axis: 0, indices: neighborIdxs),
+        feature.unsqueeze(axis: 0), features.gather(axis: 0, indices: neighborIdxs),
       ])
       let dedupIndices = try await Self.deduplicate(data: useFeatures, threshold: dedupThreshold)
         .filter { $0 > 0 }.map { $0 - 1 }

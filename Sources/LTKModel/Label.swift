@@ -5,7 +5,7 @@ import LTKLabel
 public class LabelPredictor: Trainable {
 
   public let descriptor: LabelDescriptor
-  @Child var layer: Linear
+  @Child public var layer: Linear
 
   public init(inputCount: Int, descriptor: LabelDescriptor) {
     self.descriptor = descriptor
@@ -21,7 +21,7 @@ public class PredictionLayer: Trainable {
 
   public let inputCount: Int
   public let labels: [Field: LabelDescriptor]
-  @Child var predictors: TrainableDictionary<LabelPredictor>
+  @Child public var predictors: TrainableDictionary<LabelPredictor>
 
   public init(inputCount: Int, labels: [Field: LabelDescriptor]) {
     self.inputCount = inputCount

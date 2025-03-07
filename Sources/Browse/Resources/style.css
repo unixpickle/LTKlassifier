@@ -47,6 +47,38 @@ body {
     color: #999;
 }
 
+#keyword-heading {
+    margin: 10px auto;
+    width: 300px;
+    padding: 10px;
+    background-color: #f0f0f0;
+}
+
+#keyword-heading-label {
+    font-weight: bolder;
+}
+
+#keyword-picker>label {
+    display: block;
+}
+
+#keyword-list {
+    margin: 10px auto;
+    width: 300px;
+    padding: 10px;
+    background-color: #f0f0f0;
+}
+
+#keyword-list>a {
+    color: #555;
+    display: inline-block;
+    margin: 5px;
+}
+
+#keyword-list>a:hover {
+    color: #999;
+}
+
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, 200px);
@@ -80,23 +112,23 @@ body {
     }
 }
 
-#detail-container {
+#variety-container {
     flex-direction: column;
     align-items: center;
     margin: 10px auto;
 }
 
-#detail-label {
+#variety-label {
     font-weight: bold;
     margin-bottom: 8px;
 }
 
-#detail-buttons {
+#variety-buttons {
     display: flex;
     gap: 10px;
 }
 
-.detail-button {
+.variety-button {
     width: 40px;
     /* All buttons same size */
     height: 40px;
@@ -112,42 +144,41 @@ body {
     transition: background-color 0.2s ease-in-out;
 }
 
-.detail-button .dot {
+.variety-button .dot {
     background-color: black;
     /* Dots always black */
     border-radius: 50%;
 }
 
-.detail-button .dot-1 {
+.variety-button .dot-1 {
     width: 5px;
     height: 5px;
 }
 
-.detail-button .dot-2 {
+.variety-button .dot-2 {
     width: 10px;
     height: 10px;
 }
 
-.detail-button .dot-3 {
+.variety-button .dot-3 {
     width: 15px;
     height: 15px;
 }
 
-.detail-button .dot-4 {
+.variety-button .dot-4 {
     width: 20px;
     height: 20px;
 }
 
-.detail-button .dot-5 {
+.variety-button .dot-5 {
     width: 25px;
     height: 25px;
 }
 
 /* Selected button changes color */
-.detail-button.selected {
+.variety-button.selected {
     background-color: #65bcd4;
 }
-
 
 .image-container {
     position: relative;
@@ -200,11 +231,14 @@ body.loading #back-to-top {
 
 #home-link,
 #product-heading,
-#detail-container {
+#variety-container,
+#keyword-picker,
+#keyword-heading {
     display: none;
 }
 
-body.product-page #home-link {
+body.product-page #home-link,
+body.keyword-page #home-link {
     display: block;
 }
 
@@ -212,8 +246,17 @@ body.product-page #product-heading {
     display: flex;
 }
 
-body.product-page #detail-container {
+body.keyword-page #keyword-heading {
+    display: block;
+}
+
+body.product-page #variety-container,
+body.keyword-page #variety-container {
     display: flex;
+}
+
+body.start-page #keyword-picker {
+    display: block;
 }
 
 /* Load error */
