@@ -35,6 +35,10 @@ enum ServerError: Error {
     name: .long,
     help: "Maximum number of calls to the neighbors endpoint in an hour."
   ) var maxNeighborsPerHour: Int = 1000
+  @ArgumentParser.Option(
+    name: .long,
+    help: "Maximum number of calls to the encode endpoint in an hour."
+  ) var maxEncodesPerHour: Int = 1000
 
   mutating func run() async {
     do {
@@ -46,7 +50,8 @@ enum ServerError: Error {
         clusterPath: clusterPath,
         priceOnly: priceOnly,
         proxyCount: proxyCount,
-        maxNeighborsPerHour: maxNeighborsPerHour
+        maxNeighborsPerHour: maxNeighborsPerHour,
+        maxEncodesPerHour: maxEncodesPerHour
       )
       try await server.setup()
       try await server.app.execute()
@@ -67,15 +72,18 @@ public struct Server {
   var priceOnly: Bool
   var proxyCount: Int
   var maxNeighborsPerHour: Int
+  var maxEncodesPerHour: Int
 
   var app: Application! = nil
   var db: DB! = nil
   var neighbors: Neighbors! = nil
   var neighborRateLimiter: RateLimiter! = nil
+  var encodeRateLimiter: RateLimiter! = nil
   var allPrices: [String: Double]! = nil
 
   mutating func setup() async throws {
     neighborRateLimiter = await RateLimiter(maxPerHour: Double(maxNeighborsPerHour))
+    encodeRateLimiter = await RateLimiter(maxPerHour: Double(maxEncodesPerHour))
 
     app = try await Application.make(.detect(arguments: ["browse"]))
     app.http.server.configuration.hostname = "0.0.0.0"
@@ -87,6 +95,7 @@ public struct Server {
 
     print("creating model...")
     let model = Model(labels: LabelDescriptor.allLabels)
+    model.mode = .inference
 
     print("loading from checkpoint: \(modelPath) ...")
     let data = try Data(contentsOf: URL(fileURLWithPath: modelPath))
@@ -111,6 +120,7 @@ public struct Server {
     setupImageRoute()
     setupNameRoute()
     setupRedirectRoute()
+    setupEncodeRoute()
     setupNeighborRoutes()
   }
 
@@ -217,11 +227,42 @@ public struct Server {
     }
   }
 
+  func setupEncodeRoute() {
+    let model = neighbors!.model
+    let rateLimiter = encodeRateLimiter!
+    let getRemoteHost = getRemoteHost
+    app.on(.POST, "encode", body: .collect(maxSize: "10mb")) { request -> Response in
+      let host = getRemoteHost(request)
+      if !(await rateLimiter.use(host: host)) { return Response(status: .forbidden) }
+
+      guard let imageDataBuf = request.body.data else { return Response(status: .badRequest) }
+      let imageData = Data(buffer: imageDataBuf)
+
+      guard let imageSize = getImageSize(imageData) else { return Response(status: .badRequest) }
+      if imageSize.width > 10000 || imageSize.height > 10000 {
+        return Response(status: .badRequest)
+      }
+      guard let image = loadImage(imageData, imageSize: 224, augment: false, pad: true) else {
+        return Response(status: .badRequest)
+      }
+      let features = model.use { $0.backbone(image.unsqueeze(axis: 0)).flatten() }
+      let floatData = try await features.floats().map { $0.bitPattern.littleEndian }
+        .withUnsafeBufferPointer { Data(buffer: $0) }
+      let encoded = floatData.base64EncodedString().data(using: .ascii)!
+      return Response(
+        status: .ok,
+        headers: ["content-type": "text/plain"],
+        body: .init(data: encoded)
+      )
+    }
+  }
+
   func setupNeighborRoutes() {
     let neighbors = neighbors!
     let allPrices = allPrices!
     let rateLimiter = neighborRateLimiter!
     let getRemoteHost = getRemoteHost
+    let featureCount = neighbors.model.use { $0.featureCount }
 
     @Sendable func getPrices(_ ids: some Collection<String>) -> [String: Double] {
       var results = [String: Double]()
@@ -245,16 +286,25 @@ public struct Server {
     app.on(.GET, "neighbors") { request -> Response in
       let productID = request.query[String.self, at: "id"]
       let keyword = request.query[String.self, at: "keyword"]
-      if productID == nil && keyword == nil { return Response(status: .badRequest) }
+      let features = request.query[String.self, at: "features"]
+      if productID == nil && keyword == nil && features == nil {
+        return Response(status: .badRequest)
+      }
 
       let host = getRemoteHost(request)
       if !(await rateLimiter.use(host: host)) { return Response(status: .forbidden) }
       do {
+        let strides = [1, 64, 256, 1024, 4096]
         let n =
           if let productID = productID {
-            try await neighbors.neighbors(id: productID, strides: [1, 64, 256, 1024, 4096])
+            try await neighbors.neighbors(id: productID, strides: strides)
           } else if let keyword = keyword {
-            try await neighbors.neighbors(keyword: keyword, strides: [1, 64, 256, 1024, 4096])
+            try await neighbors.neighbors(keyword: keyword, strides: strides)
+          } else if let features = features {
+            try await neighbors.neighbors(
+              feature: try decodeFeatureString(features, featureCount: featureCount),
+              strides: strides
+            )
           } else { fatalError() }
         struct Result: Codable {
           let neighbors: [Int: [String]]
@@ -270,4 +320,20 @@ public struct Server {
     }
   }
 
+}
+
+enum FeatureDecodeError: Error {
+  case featureIsNotBase64
+  case featureIsWrongLength
+}
+
+func decodeFeatureString(_ dataStr: String, featureCount: Int) throws -> Tensor {
+  guard let rawData = Data(base64Encoded: dataStr) else {
+    throw FeatureDecodeError.featureIsNotBase64
+  }
+  if rawData.count != featureCount * 4 { throw FeatureDecodeError.featureIsWrongLength }
+  let floats = rawData.withUnsafeBytes {
+    $0.bindMemory(to: UInt32.self).map { Float(bitPattern: UInt32(littleEndian: $0)) }
+  }
+  return Tensor(data: floats)
 }

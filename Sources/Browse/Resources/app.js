@@ -11,17 +11,19 @@ class App {
         try {
             const id = getQueryParam("id");
             const keyword = getQueryParam("keyword");
+            const features = getQueryParam("features");
             if (id) {
                 await this.loadNeighborGrid(id);
             } else if (keyword) {
                 await this.loadKeywordGrid(keyword);
+            } else if (features) {
+                await this.loadFeaturesGrid(features);
             } else {
                 await this.loadStartPage();
             }
             document.body.classList.remove('loading');
         } catch (e) {
-            document.body.classList.add('fatal-error');
-            document.getElementById('error-message').textContent = '' + e;
+            this.showError(e);
         }
     }
 
@@ -40,6 +42,9 @@ class App {
             link.textContent = keyword;
             keywordContainer.appendChild(link);
         });
+
+        const imageUpload = document.getElementById('image-upload');
+        imageUpload.addEventListener('click', () => this.uploadFile());
 
         document.body.classList.add('start-page');
     }
@@ -72,6 +77,19 @@ class App {
         document.body.classList.add('keyword-page');
     }
 
+    async loadFeaturesGrid(features) {
+        const response = await fetchJSON(`/neighbors?features=${encodeURIComponent(features)}`);
+        this.neighbors = response.neighbors;
+        this.prices = response.prices;
+
+        this.createVarietyDropdown();
+
+        const defaultLevel = Object.keys(this.neighbors)[0];
+        this.updateNeighborGrid(defaultLevel);
+
+        document.body.classList.add('features-page');
+    }
+
     addImageToGrid(id) {
         const imageContainer = document.createElement("div");
         imageContainer.classList.add("image-container");
@@ -95,6 +113,11 @@ class App {
         }
 
         this.imageGrid.appendChild(imageContainer);
+    }
+
+    showError(err) {
+        document.body.className = 'fatal-error';
+        document.getElementById('error-message').textContent = '' + err;
     }
 
     createVarietyDropdown() {
@@ -141,6 +164,37 @@ class App {
         this.imageGrid.innerHTML = "";
         this.neighbors[level].forEach((id) => this.addImageToGrid(id));
     }
+
+    uploadFile() {
+        const input = document.getElementById('image-upload-input');
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            try {
+                document.body.className = 'loading';
+                let encoded = await shrinkAndEncodeImage(file);
+                const response = await fetch('/encode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'image/jpeg' },
+                    body: encoded
+                });
+
+                if (!response.ok) {
+                    this.showError('Failed to upload image.');
+                    return;
+                }
+
+                const featureData = await response.text();
+                window.location = `?features=${encodeURIComponent(featureData)}`
+            } catch (error) {
+                this.showError(`Failed to read uploaded file: ${error}`);
+            }
+        };
+        input.click();
+    }
 }
 
 async function fetchJSON(url) {
@@ -158,6 +212,35 @@ function getQueryParam(name) {
 
 function scrollToTop() {
     document.body.scrollTop = document.documentElement.scrollTop = 0;
+}
+
+function shrinkAndEncodeImage(file) {
+    const maxSize = 224;
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            // Calculate new dimensions while maintaining aspect ratio
+            var width = img.width;
+            var height = img.height;
+            let scale = maxSize / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+
+            // Draw the resized image on a canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Convert canvas to JPEG
+            canvas.toBlob(blob => {
+                resolve(blob);
+            }, 'image/jpeg', 0.9);
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+    });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

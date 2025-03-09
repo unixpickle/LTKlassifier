@@ -15,7 +15,7 @@ public final class Neighbors: Sendable {
     var features: TensorState
   }
 
-  private let model: SyncTrainable<Model>
+  public let model: SyncTrainable<Model>
   private let ids: [String]
   private let features: Tensor
   public let clusterStart: [String]
@@ -116,9 +116,12 @@ public final class Neighbors: Sendable {
     )
   }
 
-  private func neighbors(feature: Tensor, strides: [Int], limit: Int, dedupThreshold: Float)
-    async throws -> [Int: [String]]
-  {
+  public func neighbors(
+    feature: Tensor,
+    strides: [Int],
+    limit: Int = 128,
+    dedupThreshold: Float = 0.02
+  ) async throws -> [Int: [String]] {
     let distances = pairwiseDistances(features, feature.unsqueeze(axis: 0)).squeeze(axis: 1)
     let sortedIdxs = distances.argsort(axis: 0)[1...]
     var results = [Int: [String]]()
