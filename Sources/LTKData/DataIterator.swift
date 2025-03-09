@@ -42,20 +42,30 @@ public struct DataIterator: Sequence, IteratorProtocol {
   let db: DB
   let batchSize: Int
   let imageSize: Int
+  let augment: Bool
+  let pad: Bool
   public var state: State
 
-  public init(dbPath: String, batchSize: Int, imageSize: Int = 224) throws {
+  public init(
+    dbPath: String,
+    batchSize: Int,
+    imageSize: Int = 224,
+    augment: Bool = true,
+    pad: Bool = false
+  ) throws {
     print(" [DataIterator] connecting DB at \(dbPath) ...")
     let pool = ConnectionPool(path: dbPath)
     self.db = DB(pool: pool)
     self.batchSize = batchSize
     self.imageSize = imageSize
+    self.augment = augment
+    self.pad = pad
     self.state = State(images: [], offset: 0)
 
     print(" [DataIterator] listing products...")
     state.images = try db.listProductsWithImages().map { ImageID.product($0) }
     print(" [DataIterator] listing LTKs...")
-    state.images.append(contentsOf: try db.listLTKsWithImages().map { ImageID.product($0) })
+    state.images.append(contentsOf: try db.listLTKsWithImages().map { ImageID.ltk($0) })
     print(" [DataIterator] sorting dataset...")
     var keys = [String: String]()
     for img in state.images { keys[img.id] = img.sortKey }
@@ -97,6 +107,8 @@ public struct DataIterator: Sequence, IteratorProtocol {
   private func readIDs(_ ids: [ImageID], into: SendableArray<(Tensor, [Field: Label])>) {
     let db = db
     let imageSize = imageSize
+    let augment = augment
+    let pad = pad
     DispatchQueue.global(qos: .userInitiated).sync {
       DispatchQueue.concurrentPerform(iterations: ids.count) { i in
         if into[i] != nil { return }
@@ -104,7 +116,7 @@ public struct DataIterator: Sequence, IteratorProtocol {
         let reader = DataReader(db: db)
         do {
           let (data, fields) = try reader.readExample(id)
-          if let img = loadImage(data, imageSize: imageSize) {
+          if let img = loadImage(data, imageSize: imageSize, augment: augment, pad: pad) {
             into[i] = (img, fields)
           } else {
             print("image \(id) could not be decoded")

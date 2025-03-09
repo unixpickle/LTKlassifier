@@ -27,6 +27,9 @@ import LTKModel
   @Option(name: .shortAndLong, help: "The weight decay for training.") var weightDecay: Float = 0.01
   @Option(name: .shortAndLong, help: "The batch size for training.") var batchSize: Int = 8
   @Option(name: .shortAndLong, help: "Steps between model saves.") var saveInterval: Int = 1000
+  @Flag(name: .long, help: "Do not augment image data.") var noAugment: Bool = false
+  @Flag(name: .long, help: "Pad raw images to be square before processing.") var padToSquare: Bool =
+    false
 
   mutating func run() async {
     do {
@@ -43,8 +46,12 @@ import LTKModel
 
       print("creating data iterator...")
       let dataIt = try {
-        var (trainLoader, testLoader) = try DataIterator(dbPath: dbPath, batchSize: batchSize)
-          .splitTrainTest()
+        var (trainLoader, testLoader) = try DataIterator(
+          dbPath: dbPath,
+          batchSize: batchSize,
+          augment: !noAugment,
+          pad: padToSquare
+        ).splitTrainTest()
         if let s = loadedState {
           if let ts = s.trainData { trainLoader.state = ts }
           if let ts = s.testData { testLoader.state = ts }

@@ -3,8 +3,14 @@ import HCBacktrace
 import Honeycrisp
 
 /// Load an image and fit it into a square.
-public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true) -> Tensor? {
-  guard let loadedImage = NSImage(data: data) else { return nil }
+public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true, pad: Bool = false)
+  -> Tensor?
+{
+  guard var loadedImage = NSImage(data: data) else { return nil }
+  if pad {
+    guard let padded = padToSquare(loadedImage) else { return nil }
+    loadedImage = padded
+  }
 
   guard let representation = loadedImage.representations.first else { return nil }
 
@@ -57,4 +63,51 @@ public func loadImage(_ data: Data, imageSize: Int, augment: Bool = true) -> Ten
     if i % 4 != 3 { floats.append(Float(buffer[i]) / 255.0) }
   }
   return Tensor(data: floats, shape: [imageSize, imageSize, 3]).move(axis: -1, to: 0)
+}
+
+func padToSquare(_ image: NSImage) -> NSImage? {
+  guard let representation = image.representations.first else { return nil }
+  let pixelSize = CGSize(
+    width: CGFloat(representation.pixelsWide),
+    height: CGFloat(representation.pixelsHigh)
+  )
+  let maxDimension = max(pixelSize.width, pixelSize.height)
+  let newSize = CGSize(width: maxDimension, height: maxDimension)
+  let newRect = CGRect(origin: .zero, size: newSize)
+  let originalRect = CGRect(
+    x: (maxDimension - pixelSize.width) / 2,
+    y: (maxDimension - pixelSize.height) / 2,
+    width: pixelSize.width,
+    height: pixelSize.height
+  )
+
+  guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: [:]) else {
+    return nil
+  }
+
+  let colorSpace = CGColorSpaceCreateDeviceRGB()
+  let bitmapInfo: CGImageAlphaInfo = .premultipliedLast
+  guard
+    let context = CGContext(
+      data: nil,
+      width: Int(newSize.width),
+      height: Int(newSize.height),
+      bitsPerComponent: 8,
+      bytesPerRow: 0,
+      space: colorSpace,
+      bitmapInfo: bitmapInfo.rawValue
+    )
+  else { return nil }
+
+  context.setFillColor(NSColor.white.cgColor)
+  context.fill(newRect)
+  context.draw(cgImage, in: originalRect)
+
+  guard let newCGImage = context.makeImage() else { return nil }
+
+  let newRepresentation = NSBitmapImageRep(cgImage: newCGImage)
+
+  let newImage = NSImage(size: NSSize(width: newSize.width, height: newSize.height))
+  newImage.addRepresentation(newRepresentation)
+  return newImage
 }
