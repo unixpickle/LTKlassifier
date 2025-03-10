@@ -30,6 +30,9 @@ import LTKModel
   @Flag(name: .long, help: "Do not augment image data.") var noAugment: Bool = false
   @Flag(name: .long, help: "Pad raw images to be square before processing.") var padToSquare: Bool =
     false
+  @Flag(name: .long, help: "Use model eval mode.") var evalMode: Bool = false
+  @Flag(name: .long, help: "Share parameters between LTK and product heads when possible.")
+  var shareParameters: Bool = false
 
   mutating func run() async {
     do {
@@ -43,6 +46,11 @@ import LTKModel
         let decoder = PropertyListDecoder()
         loadedState = try decoder.decode(State.self, from: data)
       }
+
+      print("creating model...")
+      let model = Model(labels: LabelDescriptor.allLabels, featureCount: featureCount)
+      if let state = loadedState?.model { try model.reconfigureAndLoad(state) }
+      if evalMode { model.mode = .inference }
 
       print("creating data iterator...")
       let dataIt = try {
@@ -69,10 +77,6 @@ import LTKModel
           }
         )
       }()
-
-      print("creating model...")
-      let model = Model(labels: LabelDescriptor.allLabels, featureCount: featureCount)
-      if let state = loadedState?.model { try model.reconfigureAndLoad(state) }
 
       print("creating optimizer...")
       let opt = Adam(model.parameters, lr: learningRate, weightDecay: weightDecay)
@@ -116,6 +120,7 @@ import LTKModel
         }
 
         loss.backward()
+        if shareParameters { model.mergeCompatibleParamsAndGrads() }
 
         let (gradNorm, clipScale) = try await clipper.clipGrads(model: model)
         if !gradNorm.isFinite {
@@ -128,6 +133,7 @@ import LTKModel
 
         opt.step()
         opt.clearGrads()
+        if shareParameters { model.mergeCompatibleParamsAndGrads() }
         step += 1
 
         logFields.append("grad_norm=\(gradNorm)")

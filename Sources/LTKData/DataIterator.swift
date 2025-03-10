@@ -159,6 +159,7 @@ private struct DataReader {
     var allProductsHavePrice: Bool = true
     var productCount: Int = 0
     var retailers = [Bool](repeating: false, count: Retailer.count)
+    var productKeywords = [Bool](repeating: false, count: ProductKeyword.count)
     for id in productIDs.split(separator: ",").map({ String($0) }) {
       if id.isEmpty { continue }
       guard let row = try db.getProduct(id: id) else { continue }
@@ -171,6 +172,9 @@ private struct DataReader {
       if let retailer = row[db.fields.retailerDisplayName] {
         retailers[Retailer.label(retailer)] = true
       }
+      if let productName = row[db.fields.name] {
+        setProductKeywords(name: productName, keywords: &productKeywords)
+      }
     }
     if allProductsHavePrice && productCount > 0 {
       fields[.ltkTotalDollars] = .categorical(
@@ -179,6 +183,7 @@ private struct DataReader {
       )
     }
     fields[.ltkRetailers] = .bitset(retailers)
+    fields[.ltkProductKeywords] = .bitset(productKeywords)
     fields[.ltkProductCount] = .categorical(
       count: LabelDescriptor.maxProductCount,
       label: Swift.min(productCount, LabelDescriptor.maxProductCount - 1)
@@ -211,12 +216,16 @@ private struct DataReader {
       !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     {
       var keywords = [Bool](repeating: false, count: ProductKeyword.count)
-      for token in name.lowercased().components(separatedBy: .whitespacesAndNewlines) {
-        if let tokenIdx = ProductKeyword.label(token) { keywords[tokenIdx] = true }
-      }
+      setProductKeywords(name: name, keywords: &keywords)
       fields[.productKeywords] = .bitset(keywords)
     }
     return (imageData, fields)
   }
 
+}
+
+func setProductKeywords(name: String, keywords: inout [Bool]) {
+  for token in name.lowercased().components(separatedBy: .whitespacesAndNewlines) {
+    if let tokenIdx = ProductKeyword.label(token) { keywords[tokenIdx] = true }
+  }
 }

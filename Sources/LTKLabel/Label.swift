@@ -5,6 +5,7 @@ public enum Field: String, Sendable, Codable {
   case ltkProductCount = "ltk_product_count"
   case ltkHashtags = "ltk_hashtags"
   case ltkRetailers = "ltk_retailers"
+  case ltkProductKeywords = "ltk_product_keywords"
   case productRetailer = "product_retailer"
   case productKeywords = "product_keywords"
 
@@ -16,6 +17,7 @@ public enum Field: String, Sendable, Codable {
     case .ltkProductCount: (0..<LabelDescriptor.maxProductCount).map { "\($0)" }
     case .ltkHashtags: Hashtag.values
     case .ltkRetailers: ["Unknown"] + Retailer.canonicalNames
+    case .ltkProductKeywords: ProductKeyword.items
     case .productRetailer: ["Unknown"] + Retailer.canonicalNames
     case .productKeywords: ProductKeyword.items
     }
@@ -32,6 +34,7 @@ public enum LabelDescriptor: Sendable {
     .ltkProductCount: LabelDescriptor.categorical(maxProductCount),
     .ltkHashtags: LabelDescriptor.bitset(Hashtag.count),
     .ltkRetailers: LabelDescriptor.bitset(Retailer.count),
+    .ltkProductKeywords: LabelDescriptor.bitset(ProductKeyword.count),
     .productRetailer: LabelDescriptor.categorical(Retailer.count),
     .productKeywords: LabelDescriptor.bitset(ProductKeyword.count),
   ]

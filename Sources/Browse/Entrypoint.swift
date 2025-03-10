@@ -139,8 +139,10 @@ public struct Server {
   }
 
   func setupFileRoutes() throws {
-    let filenames = ["index.html", "app.js", "style.css"]
-    let contentTypes = ["html": "text/html", "js": "text/javascript", "css": "text/css"]
+    let filenames = ["index.html", "app.js", "style.css", "favicon.ico"]
+    let contentTypes = [
+      "html": "text/html", "js": "text/javascript", "css": "text/css", "ico": "image/x-icon",
+    ]
     for filename in filenames {
       let parts = filename.split(separator: ".")
       guard
@@ -242,7 +244,8 @@ public struct Server {
       if imageSize.width > 10000 || imageSize.height > 10000 {
         return Response(status: .badRequest)
       }
-      guard let image = loadImage(imageData, imageSize: 224, augment: false, pad: true) else {
+      // TODO: change pad to true.
+      guard let image = loadImage(imageData, imageSize: 224, augment: false, pad: false) else {
         return Response(status: .badRequest)
       }
       let features = model.use { $0.backbone(image.unsqueeze(axis: 0)).flatten() }
