@@ -87,6 +87,32 @@ class App {
         const defaultLevel = Object.keys(this.neighbors)[0];
         this.updateNeighborGrid(defaultLevel);
 
+        const clf = response.classification;
+        const productProbElem = document.getElementById('features-product-prob');
+        productProbElem.innerHTML = `Our AI predicts a <span class="probability">${Math.round(clf.productProb * 100)}%</span> chance that this is a product image.`;
+        if (clf.productProb < 0.2) {
+            productProbElem.innerHTML += ' <span class="warning">As a result, these results might be low-quality.</span>';
+        }
+
+        // TODO: show top keywordProbs
+        const probMap = clf.keywordProbs; // mapping from keyword strings to probabilities
+        const sortedKeywords = Object.keys(probMap).sort((x, y) => {
+            if (probMap[x] < probMap[y]) {
+                return 1;
+            } else {
+                return -1;
+            }
+        });
+
+        const keywordElement = document.getElementById('features-keyword-list');
+        keywordElement.textContent = 'Related keywords: ';
+        sortedKeywords.slice(0, 5).forEach((kw) => {
+            const link = document.createElement('a');
+            link.textContent = kw;
+            link.href = `?keyword=${encodeURIComponent(kw)}`;
+            keywordElement.appendChild(link);
+        });
+
         document.body.classList.add('features-page');
     }
 
@@ -201,6 +227,10 @@ async function fetchJSON(url) {
     const response = await fetch(url);
     if (response.status == 403) {
         throw 'Permission denied. Perhaps the rate limit was exceeded?';
+    } else if (response.status == 404) {
+        throw 'Result not found.';
+    } else if (response.status != 200) {
+        throw `Unexpected status in response: ${response.status}.`;
     }
     return response.json();
 }
@@ -238,7 +268,7 @@ function shrinkAndEncodeImage(file) {
                 resolve(blob);
             }, 'image/jpeg', 0.9);
         };
-        img.onerror = reject;
+        img.onerror = () => reject('failed to decode image');
         img.src = URL.createObjectURL(file);
     });
 }

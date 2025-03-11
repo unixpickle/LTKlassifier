@@ -10,6 +10,11 @@ public final class Neighbors: Sendable {
     case keywordNotFound(String)
   }
 
+  public struct Classification: Codable {
+    public let productProb: Float
+    public let keywordProbs: [String: Float]
+  }
+
   struct FeatureShard: Codable {
     var ids: [String]
     var features: TensorState
@@ -80,42 +85,6 @@ public final class Neighbors: Sendable {
     self.ids = ids
   }
 
-  public func neighbors(id: String, strides: [Int], limit: Int = 128, dedupThreshold: Float = 0.02)
-    async throws -> [Int: [String]]
-  {
-    guard let sourceIdx = ids.firstIndex(of: id) else { throw NeighborError.idNotFound(id) }
-    let sourceFeature = features[sourceIdx]
-    return try await neighbors(
-      feature: sourceFeature,
-      strides: strides,
-      limit: limit,
-      dedupThreshold: dedupThreshold
-    )
-  }
-
-  public func neighbors(
-    keyword: String,
-    strides: [Int],
-    limit: Int = 128,
-    dedupThreshold: Float = 0.02
-  ) async throws -> [Int: [String]] {
-    guard let keywordIdx = ProductKeyword.label(keyword) else {
-      throw NeighborError.keywordNotFound(keyword)
-    }
-    var sourceFeature = model.use {
-      $0.prediction.predictors.children[Field.productKeywords.rawValue]!.layer.weight.t()[
-        keywordIdx
-      ]
-    }
-    sourceFeature = sourceFeature / sourceFeature.pow(2).sum().sqrt()
-    return try await neighbors(
-      feature: sourceFeature,
-      strides: strides,
-      limit: limit,
-      dedupThreshold: dedupThreshold
-    )
-  }
-
   public func neighbors(
     feature: Tensor,
     strides: [Int],
@@ -141,6 +110,34 @@ public final class Neighbors: Sendable {
         .ints().map { ids[$0] }
     }
     return results
+  }
+
+  public func classify(feature: Tensor) async throws -> Classification {
+    let labels = model.use { $0.prediction(feature.unsqueeze(axis: 0)) }
+    let prodProb: Float = try await labels[.imageKind]!.flatten().softmax(axis: 0).floats()[
+      ImageKind.product.rawValue
+    ]
+    let keywordProbs = try await labels[.productKeywords]!.flatten().softmax(axis: 0).floats()
+    let keywordMap = Dictionary(uniqueKeysWithValues: zip(ProductKeyword.items, keywordProbs))
+    return Classification(productProb: prodProb, keywordProbs: keywordMap)
+  }
+
+  public func feature(id: String) throws -> Tensor {
+    guard let sourceIdx = ids.firstIndex(of: id) else { throw NeighborError.idNotFound(id) }
+    return features[sourceIdx]
+  }
+
+  public func feature(keyword: String) throws -> Tensor {
+    guard let keywordIdx = ProductKeyword.label(keyword) else {
+      throw NeighborError.keywordNotFound(keyword)
+    }
+    var sourceFeature = model.use {
+      $0.prediction.predictors.children[Field.productKeywords.rawValue]!.layer.weight.t()[
+        keywordIdx
+      ]
+    }
+    sourceFeature = sourceFeature / sourceFeature.pow(2).sum().sqrt()
+    return sourceFeature
   }
 
   /// Return indices of elements in the tensor to keep.

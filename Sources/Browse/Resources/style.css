@@ -40,11 +40,11 @@ body {
 #product-heading .product-name {
     margin: auto;
     text-decoration: none;
-    color: #555;
+    color: #3b9ecc;
 }
 
 #product-heading .product-name:hover {
-    color: #999;
+    color: #45c4ff;
 }
 
 #keyword-heading {
@@ -56,6 +56,36 @@ body {
 
 #keyword-heading-label {
     font-weight: bolder;
+}
+
+#features-heading {
+    margin: 10px auto;
+    width: 300px;
+    padding: 10px;
+    background-color: #f0f0f0;
+}
+
+#features-product-prob {
+    margin-bottom: 5px;
+}
+
+#features-product-prob .probability {
+    font-weight: bolder;
+}
+
+#features-product-prob .warning {
+    font-weight: bolder;
+    color: #f44;
+}
+
+#features-keyword-list>a {
+    color: #555;
+    display: inline-block;
+    margin: 0 3px;
+}
+
+#features-keyword-list>a:hover {
+    color: #999;
 }
 
 #init-picker>label {
@@ -256,7 +286,8 @@ body.loading #back-to-top {
 #product-heading,
 #variety-container,
 #init-picker,
-#keyword-heading {
+#keyword-heading,
+#features-heading {
     display: none;
 }
 
@@ -271,6 +302,10 @@ body.product-page #product-heading {
 }
 
 body.keyword-page #keyword-heading {
+    display: block;
+}
+
+body.features-page #features-heading {
     display: block;
 }
 
@@ -298,7 +333,7 @@ body.fatal-error #fatal-error {
     display: block;
     margin: 10px auto;
     width: 250px;
-    color: red;
+    color: #f40;
     text-align: center;
     background-color: #f0f0f0;
     padding: 10px;

@@ -139,9 +139,10 @@ public struct Server {
   }
 
   func setupFileRoutes() throws {
-    let filenames = ["index.html", "app.js", "style.css", "favicon.ico"]
+    let filenames = ["index.html", "app.js", "style.css", "favicon.ico", "robots.txt"]
     let contentTypes = [
       "html": "text/html", "js": "text/javascript", "css": "text/css", "ico": "image/x-icon",
+      "txt": "text/plain",
     ]
     for filename in filenames {
       let parts = filename.split(separator: ".")
@@ -297,23 +298,26 @@ public struct Server {
       let host = getRemoteHost(request)
       if !(await rateLimiter.use(host: host)) { return Response(status: .forbidden) }
       do {
-        let strides = [1, 64, 256, 1024, 4096]
-        let n =
+        let feature: Tensor =
           if let productID = productID {
-            try await neighbors.neighbors(id: productID, strides: strides)
+            try neighbors.feature(id: productID)
           } else if let keyword = keyword {
-            try await neighbors.neighbors(keyword: keyword, strides: strides)
+            try neighbors.feature(keyword: keyword)
           } else if let features = features {
-            try await neighbors.neighbors(
-              feature: try decodeFeatureString(features, featureCount: featureCount),
-              strides: strides
-            )
+            try decodeFeatureString(features, featureCount: featureCount)
           } else { fatalError() }
+        let n = try await neighbors.neighbors(feature: feature, strides: [1, 64, 256, 1024, 4096])
+        let clf = try await neighbors.classify(feature: feature)
         struct Result: Codable {
           let neighbors: [Int: [String]]
           let prices: [String: Double]
+          let classification: Neighbors.Classification
         }
-        let resp = Result(neighbors: n, prices: getPrices(Set(n.values.flatMap { $0 })))
+        let resp = Result(
+          neighbors: n,
+          prices: getPrices(Set(n.values.flatMap { $0 })),
+          classification: clf
+        )
         return Response(
           status: .ok,
           headers: ["content-type": "application/json"],
