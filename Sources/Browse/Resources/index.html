@@ -12,7 +12,7 @@
 
 <body class="loading">
     <a id="home-link" href="/">&larr; Start over</a>
-    <div id="product-heading">
+    <div id="product-heading" class="heading-panel">
         <img class="image">
         <div class="fields">
             <div class="field" style="margin-top: 0px">
@@ -21,28 +21,28 @@
             </div>
             <div class="field field-retailer" style="display: none">
                 <label class="name">Retailer</label>
-                <label class="field-value"></label>
+                <div class="field-value"></div>
             </div>
             <div class="field field-price" style="display: none">
                 <label class="name">Price</label>
-                <label class="field-value"></label>
+                <div class="field-value"></div>
             </div>
         </div>
     </div>
 
-    <div id="keyword-heading">
+    <div id="keyword-heading" class="heading-panel">
         <label>Results for vibe:</label>
-        <label id="keyword-heading-label"></label>
+        <span id="keyword-heading-label"></span>
     </div>
 
-    <div id="features-heading">
+    <div id="features-heading" class="heading-panel">
         <div id="features-product-prob"></div>
         <div id="features-keyword-list"></div>
     </div>
 
     <div id="init-picker">
         <label>Set the vibe with a word</label>
-        <div id="keyword-list"></div>
+        <div id="keyword-list" class="heading-panel"></div>
         <label>Or upload an image</label>
         <button id="image-upload">Upload</button>
         <input id="image-upload-input" type="file">
@@ -77,8 +77,8 @@
     <button id="back-to-top" onclick="scrollToTop()">&uarr; Back to top</button>
 
     <div id="fatal-error">
-        <label class="heading">An error has occurred while loading the content.</label>
-        <label id="error-message"></label>
+        <div class="heading">An error has occurred while loading the content.</div>
+        <div id="error-message"></div>
     </div>
 
     <div id="loader">⏳ Loading</div>

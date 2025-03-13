@@ -77,6 +77,7 @@ public struct Server {
   var app: Application! = nil
   var db: DB! = nil
   var neighbors: Neighbors! = nil
+  var modelWrapper: ModelWrapper! = nil
   var neighborRateLimiter: RateLimiter! = nil
   var encodeRateLimiter: RateLimiter! = nil
   var allPrices: [String: Double]! = nil
@@ -103,6 +104,8 @@ public struct Server {
     let loadedState = try decoder.decode(State.self, from: data)
     try model.reconfigureAndLoad(loadedState.model)
 
+    modelWrapper = ModelWrapper(model: SyncTrainable(model))
+
     print("creating DB...")
     db = DB(pool: ConnectionPool(path: dbPath))
 
@@ -111,7 +114,6 @@ public struct Server {
 
     print("creating neighbors...")
     neighbors = try await Neighbors(
-      model: model,
       featureDir: featureDir,
       clusterPath: clusterPath,
       whitelist: (priceOnly ? Array(allPrices!.keys) : nil)
@@ -231,7 +233,7 @@ public struct Server {
   }
 
   func setupEncodeRoute() {
-    let model = neighbors!.model
+    let modelWrapper = modelWrapper!
     let rateLimiter = encodeRateLimiter!
     let getRemoteHost = getRemoteHost
     app.on(.POST, "encode", body: .collect(maxSize: "10mb")) { request -> Response in
@@ -249,7 +251,7 @@ public struct Server {
       guard let image = loadImage(imageData, imageSize: 224, augment: false, pad: false) else {
         return Response(status: .badRequest)
       }
-      let features = model.use { $0.backbone(image.unsqueeze(axis: 0)).flatten() }
+      let features = modelWrapper.encodeImage(image)
       let floatData = try await features.floats().map { $0.bitPattern.littleEndian }
         .withUnsafeBufferPointer { Data(buffer: $0) }
       let encoded = floatData.base64EncodedString().data(using: .ascii)!
@@ -263,10 +265,10 @@ public struct Server {
 
   func setupNeighborRoutes() {
     let neighbors = neighbors!
+    let modelWrapper = modelWrapper!
     let allPrices = allPrices!
     let rateLimiter = neighborRateLimiter!
     let getRemoteHost = getRemoteHost
-    let featureCount = neighbors.model.use { $0.featureCount }
 
     @Sendable func getPrices(_ ids: some Collection<String>) -> [String: Double] {
       var results = [String: Double]()
@@ -302,16 +304,20 @@ public struct Server {
           if let productID = productID {
             try neighbors.feature(id: productID)
           } else if let keyword = keyword {
-            try neighbors.feature(keyword: keyword)
+            try modelWrapper.feature(keyword: keyword)
           } else if let features = features {
-            try decodeFeatureString(features, featureCount: featureCount)
+            try decodeFeatureString(features, featureCount: modelWrapper.featureCount)
           } else { fatalError() }
-        let n = try await neighbors.neighbors(feature: feature, strides: [1, 64, 256, 1024, 4096])
-        let clf = try await neighbors.classify(feature: feature)
+        let n = try await neighbors.neighbors(
+          feature: feature,
+          strides: [1, 64, 256, 1024, 4096],
+          dedupAgainstFeature: productID != nil
+        )
+        let clf = try await modelWrapper.classify(feature: feature)
         struct Result: Codable {
           let neighbors: [Int: [String]]
           let prices: [String: Double]
-          let classification: Neighbors.Classification
+          let classification: ModelWrapper.Classification
         }
         let resp = Result(
           neighbors: n,

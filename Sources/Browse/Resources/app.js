@@ -90,7 +90,7 @@ class App {
         const clf = response.classification;
         const productProbElem = document.getElementById('features-product-prob');
         productProbElem.innerHTML = `Our AI predicts a <span class="probability">${Math.round(clf.productProb * 100)}%</span> chance that this is a product image.`;
-        if (clf.productProb < 0.2) {
+        if (clf.productProb < 0.3) {
             productProbElem.innerHTML += ' <span class="warning">As a result, these results might be low-quality.</span>';
         }
 

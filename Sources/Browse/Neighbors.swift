@@ -3,33 +3,24 @@ import Honeycrisp
 import LTKLabel
 import LTKModel
 
+public enum NeighborError: Error {
+  case idNotFound(String)
+  case keywordNotFound(String)
+}
+
 public final class Neighbors: Sendable {
-
-  public enum NeighborError: Error {
-    case idNotFound(String)
-    case keywordNotFound(String)
-  }
-
-  public struct Classification: Codable {
-    public let productProb: Float
-    public let keywordProbs: [String: Float]
-  }
 
   struct FeatureShard: Codable {
     var ids: [String]
     var features: TensorState
   }
 
-  public let model: SyncTrainable<Model>
   private let ids: [String]
   private let features: Tensor
+  private let featuresSqSum: Tensor
   public let clusterStart: [String]
 
-  public init(model: sending Model, featureDir: String, clusterPath: String, whitelist: [String]?)
-    async throws
-  {
-    self.model = SyncTrainable(model)
-
+  public init(featureDir: String, clusterPath: String, whitelist: [String]?) async throws {
     let decoder = PropertyListDecoder()
 
     print(" - loading features from \(featureDir) ...")
@@ -82,62 +73,51 @@ public final class Neighbors: Sendable {
 
     self.clusterStart = clusterStart
     self.features = features
+    self.featuresSqSum = self.features.pow(2).sum(axis: 1)
     self.ids = ids
   }
 
   public func neighbors(
     feature: Tensor,
     strides: [Int],
+    queryLimit: Int = 256 - 1,
     limit: Int = 128,
-    dedupThreshold: Float = 0.02
+    dedupThreshold: Float = 0.02,
+    dedupAgainstFeature: Bool = false
   ) async throws -> [Int: [String]] {
-    let distances = pairwiseDistances(features, feature.unsqueeze(axis: 0)).squeeze(axis: 1)
-    let sortedIdxs = distances.argsort(axis: 0)[1...]
+    let distances = pairwiseDistances(
+      features,
+      feature.unsqueeze(axis: 0),
+      dataSqSum: featuresSqSum
+    ).squeeze(axis: 1)
+    let sortedIdxs = distances.argsort(axis: 0)
     var results = [Int: [String]]()
     for s in strides {
-      let idxsInSorted = stride(from: s - 1, to: min(sortedIdxs.shape[0], (limit + 1) * s), by: s)
+      let idxsInSorted = stride(
+        from: s - 1,
+        to: min(sortedIdxs.shape[0], (queryLimit + 1) * s),
+        by: s
+      )
       let neighborIdxs = sortedIdxs[idxsInSorted]
 
-      // The first feature vector has the highest priority in the dedup, so we
-      // make sure we won't show results that are duplicates of the query.
-      let useFeatures = Tensor(concat: [
-        feature.unsqueeze(axis: 0), features.gather(axis: 0, indices: neighborIdxs),
-      ])
-      let dedupIndices = try await Self.deduplicate(data: useFeatures, threshold: dedupThreshold)
-        .filter { $0 > 0 }.map { $0 - 1 }
+      var useFeatures = features.gather(axis: 0, indices: neighborIdxs)
+      if dedupAgainstFeature {
+        // The first feature vector has the highest priority in the dedup, so we
+        // make sure we won't show results that are duplicates of the query.
+        useFeatures = Tensor(concat: [feature.unsqueeze(axis: 0), useFeatures])
+      }
+      var dedupIndices = try await Self.deduplicate(data: useFeatures, threshold: dedupThreshold)
+      if dedupAgainstFeature { dedupIndices = dedupIndices.filter { $0 > 0 }.map { $0 - 1 } }
 
       results[s] = try await neighborIdxs.gather(axis: 0, indices: Tensor(data: dedupIndices))
-        .ints().map { ids[$0] }
+        .ints().prefix(limit).map { ids[$0] }
     }
     return results
-  }
-
-  public func classify(feature: Tensor) async throws -> Classification {
-    let labels = model.use { $0.prediction(feature.unsqueeze(axis: 0)) }
-    let prodProb: Float = try await labels[.imageKind]!.flatten().softmax(axis: 0).floats()[
-      ImageKind.product.rawValue
-    ]
-    let keywordProbs = try await labels[.productKeywords]!.flatten().softmax(axis: 0).floats()
-    let keywordMap = Dictionary(uniqueKeysWithValues: zip(ProductKeyword.items, keywordProbs))
-    return Classification(productProb: prodProb, keywordProbs: keywordMap)
   }
 
   public func feature(id: String) throws -> Tensor {
     guard let sourceIdx = ids.firstIndex(of: id) else { throw NeighborError.idNotFound(id) }
     return features[sourceIdx]
-  }
-
-  public func feature(keyword: String) throws -> Tensor {
-    guard let keywordIdx = ProductKeyword.label(keyword) else {
-      throw NeighborError.keywordNotFound(keyword)
-    }
-    var sourceFeature = model.use {
-      $0.prediction.predictors.children[Field.productKeywords.rawValue]!.layer.weight.t()[
-        keywordIdx
-      ]
-    }
-    sourceFeature = sourceFeature / sourceFeature.pow(2).sum().sqrt()
-    return sourceFeature
   }
 
   /// Return indices of elements in the tensor to keep.
@@ -179,7 +159,7 @@ public final class Neighbors: Sendable {
 
 }
 
-func pairwiseDistances(_ data: Tensor, _ queries: Tensor) -> Tensor {
-  data.pow(2).sum(axis: 1).unsqueeze(axis: 1) + queries.pow(2).sum(axis: 1).unsqueeze(axis: 0) - 2
-    * (data &* queries.t())
+func pairwiseDistances(_ data: Tensor, _ queries: Tensor, dataSqSum: Tensor? = nil) -> Tensor {
+  (dataSqSum ?? data.pow(2).sum(axis: 1)).unsqueeze(axis: 1)
+    + queries.pow(2).sum(axis: 1).unsqueeze(axis: 0) - 2 * (data &* queries.t())
 }

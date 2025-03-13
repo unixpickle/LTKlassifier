@@ -84,7 +84,7 @@ import LTKModel
           let inputData = batchImageData
           DispatchQueue.global(qos: .userInitiated).sync {
             DispatchQueue.concurrentPerform(iterations: inputData.count) { i in
-              if let img = loadImage(inputData[i], imageSize: 224, augment: false) {
+              if let img = loadImage(inputData[i], imageSize: 224, augment: false, pad: true) {
                 results[i] = img
               }
             }
