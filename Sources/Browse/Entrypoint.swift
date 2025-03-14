@@ -79,12 +79,16 @@ public struct Server {
   var neighbors: Neighbors! = nil
   var modelWrapper: ModelWrapper! = nil
   var neighborRateLimiter: RateLimiter! = nil
+  var neighborSem: KeyedSemaphore<String>! = nil
   var encodeRateLimiter: RateLimiter! = nil
+  var imageSem: KeyedSemaphore<String>! = nil
   var allPrices: [String: Double]! = nil
 
   mutating func setup() async throws {
     neighborRateLimiter = await RateLimiter(maxPerHour: Double(maxNeighborsPerHour))
+    neighborSem = await KeyedSemaphore(limit: 1)
     encodeRateLimiter = await RateLimiter(maxPerHour: Double(maxEncodesPerHour))
+    imageSem = await KeyedSemaphore(limit: 64, queueLimit: 2048)
 
     app = try await Application.make(.detect(arguments: ["browse"]))
     app.http.server.configuration.hostname = "0.0.0.0"
@@ -166,24 +170,33 @@ public struct Server {
 
   func setupImageRoute() {
     let db = db!
+    let sem = imageSem!
+    let getRemoteHost = getRemoteHost
+
     app.on(.GET, "productImage") { request -> Response in
       guard let productID = request.query[String.self, at: "id"] else {
         return Response(status: .badRequest)
       }
       let isPreview = (request.query[String.self, at: "preview"] ?? "0") == "1"
-      let imageData: Data? = await withCheckedContinuation { continuation in
-        DispatchQueue.global().async {
-          guard let rawData = try? db.getProductImage(id: productID) else {
-            continuation.resume(returning: nil)
-            return
-          }
-          if isPreview, let shrunk = shrinkImage(rawData, maxSideLength: 400) {
-            continuation.resume(returning: shrunk)
-          } else {
-            continuation.resume(returning: rawData)
+      let host = getRemoteHost(request)
+      var imageData: Data? = nil
+      do {
+        imageData = try await sem.use(key: host) {
+          await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+              guard let rawData = try? db.getProductImage(id: productID) else {
+                continuation.resume(returning: nil)
+                return
+              }
+              if isPreview, let shrunk = shrinkImage(rawData, maxSideLength: 400) {
+                continuation.resume(returning: shrunk)
+              } else {
+                continuation.resume(returning: rawData)
+              }
+            }
           }
         }
-      }
+      } catch is TooManyConcurrentRequests { return Response(status: .forbidden) }
       guard let imageData = imageData else { return Response(status: .notFound) }
       return Response(
         status: .ok,
@@ -268,6 +281,7 @@ public struct Server {
     let modelWrapper = modelWrapper!
     let allPrices = allPrices!
     let rateLimiter = neighborRateLimiter!
+    let semaphore = neighborSem!
     let getRemoteHost = getRemoteHost
 
     @Sendable func getPrices(_ ids: some Collection<String>) -> [String: Double] {
@@ -308,11 +322,13 @@ public struct Server {
           } else if let features = features {
             try decodeFeatureString(features, featureCount: modelWrapper.featureCount)
           } else { fatalError() }
-        let n = try await neighbors.neighbors(
-          feature: feature,
-          strides: [1, 64, 256, 1024, 4096],
-          dedupAgainstFeature: productID != nil
-        )
+        let n = try await semaphore.use(key: host) {
+          try await neighbors.neighbors(
+            feature: feature,
+            strides: [1, 64, 256, 1024, 4096],
+            dedupAgainstFeature: productID != nil
+          )
+        }
         let clf = try await modelWrapper.classify(feature: feature)
         struct Result: Codable {
           let neighbors: [Int: [String]]
@@ -329,7 +345,9 @@ public struct Server {
           headers: ["content-type": "application/json"],
           body: .init(data: try! JSONEncoder().encode(resp))
         )
-      } catch { return Response(status: .badRequest) }
+      } catch is TooManyConcurrentRequests { return Response(status: .forbidden) } catch {
+        return Response(status: .badRequest)
+      }
     }
   }
 
